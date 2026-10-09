@@ -98,14 +98,25 @@ design: it flags claims *for review*, never declares them false.
 
 ## Backend
 
-Verified working 2026-10-09: `iamhc` / `DeepSeek-V4-Flash`, ~4–10s,
-OpenAI-compatible.
+Verified working 2026-10-09, both via live call:
 
-`opencode-go-friend` (`OPENCODE_FRIEND_API_KEY`, the variable you mentioned —
-note singular "FRIEND") has a key present but returns HTTP 403:
-*"An active OpenCode Go subscription is required to use Go models."* It also
-requires an `x-opencode-session` header and blocks non-browser user agents.
-Recorded in `oracle.PROVIDERS` so it is not rediscovered the hard way.
+| Provider | Model | Latency | Notes |
+|---|---|---|---|
+| `zen` | `space-bunny-free` | ~1.7s | Default. `/zen/v1` |
+| `iamhc` | `DeepSeek-V4-Flash` | ~4–10s | Exposes `reasoning_tokens` |
+| `zen-go` | `deepseek-v4-pro` | — | **HTTP 403**, paid tier |
+
+`OPENCODE_FRIEND_API_KEY` (singular "FRIEND") works against
+`https://opencode.ai/zen/v1` with `space-bunny-free`. It does **not** work
+against `/zen/go/v1`, which is a different product requiring an active Go
+subscription — conflating the two is what made the key look dead. Both are
+recorded in `oracle.PROVIDERS`.
+
+`space-bunny-free` is the default oracle: faster, free, and it answered the
+OWASP A01:2021 spot-check correctly on first call.
+
+Set `TINYFORGE_NETWORK_TESTS=1` to run the live API test; it is skipped by
+default so the suite does not depend on a third party being up.
 
 ## Honest unknowns
 

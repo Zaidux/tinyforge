@@ -16,8 +16,9 @@ Design constraints, in priority order:
    oracle's variance, not the scorer's effect.
 
 Providers on this box (verified 2026-10-09):
-  iamhc / DeepSeek-V4-Flash  — works, ~4s, exposes reasoning_tokens
-  opencode-go-friend        — key present but requires an active Go
+  zen / space-bunny-free     — works, ~2-4s, OpenAI-compatible
+  iamhc / DeepSeek-V4-Flash  — works, ~4-10s, exposes reasoning_tokens
+  zen-go / deepseek-v4-pro   — key present but requires an active Go
                               subscription; returns HTTP 403 "An active
                               OpenCode Go subscription is required"
 """
@@ -45,15 +46,24 @@ _UA = (
     "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
 )
 
-#: Known provider endpoints. Only ``iamhc`` is confirmed working; the
-#: opencode-go endpoints require a paid subscription.
+#: Known provider endpoints, all verified by live call on 2026-10-09.
+#:
+#: Note the distinction between ``zen`` and ``zen/go``: they are different
+#: products with different entitlements. ``/zen/v1`` serves the free tier
+#: including ``space-bunny-free``; ``/zen/go/v1`` serves the paid Go models
+#: and rejects the friend key with HTTP 403.
 PROVIDERS: dict[str, dict[str, str]] = {
+    "zen": {
+        "base_url": "https://opencode.ai/zen/v1",
+        "api_key_env": "OPENCODE_FRIEND_API_KEY",
+        "default_model": "space-bunny-free",
+    },
     "iamhc": {
         "base_url": "https://api.iamhc.cn/v1",
         "api_key_env": "IAMHC_API_KEY",
         "default_model": "DeepSeek-V4-Flash",
     },
-    "opencode-go-friend": {
+    "zen-go": {
         "base_url": "https://opencode.ai/zen/go/v1",
         "api_key_env": "OPENCODE_FRIEND_API_KEY",
         "default_model": "deepseek-v4-pro",
@@ -93,7 +103,7 @@ class LLMResponse:
 class OracleConfig:
     """Which model to call and how."""
 
-    provider: str = "iamhc"
+    provider: str = "zen"
     model: str = ""
     temperature: float = 0.0
     max_tokens: int = 512

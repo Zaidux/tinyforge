@@ -56,3 +56,6 @@ include = ["tinyforge*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "network: hits a third-party API; opt in with TINYFORGE_NETWORK_TESTS=1",
+]

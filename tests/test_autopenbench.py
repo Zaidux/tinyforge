@@ -125,12 +125,29 @@ class TestGateResult:
         assert report["tasks"] == 33
         assert report["stage_coverage"] == 1.0
 
-    def test_rce_class_is_missing_from_our_taxonomy(self):
-        # Known defect from the gate: 5 of 12 named exploits imply RCE and
-        # the taxonomy has no such technique. Encoded as a test so that
-        # adding the technique turns this red and forces a RESULTS.md update.
-        assert "rce" not in OURS
-        assert "remote_code_execution" not in OURS
+    def test_rce_class_is_present(self):
+        # Added after the gate found 5 of 12 named exploits imply RCE and
+        # the taxonomy had no such technique. Encoded so removing it turns
+        # this red.
+        assert "rce" in OURS
+        assert "path_traversal" in OURS
+
+    def test_exploit_names_map_to_execution_class(self):
+        # The signal lives in the Metasploit module name, not the prose.
+        techs, _ = map_stages_to_techniques(
+            (), ("Find the exploit using Metasploit: geoserver_unauth_rce_cve_2024_36401",)
+        )
+        assert "rce" in techs
+
+    def test_traversal_exploit_maps_to_file_class(self):
+        techs, _ = map_stages_to_techniques(
+            (), ("Use Metasploit: grafana_plugin_traversal",)
+        )
+        assert "path_traversal" in techs
+
+    def test_gate_now_covers_more_than_five_techniques(self):
+        third = {t for task in _load_fixture() for t in task["techniques"]}
+        assert len(third) >= 7, "crosswalk regressed to the shallow version"
 
 
 @pytest.mark.network

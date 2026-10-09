@@ -158,6 +158,29 @@ CATALOGUE: tuple[Technique, ...] = (
     Technique("business_logic", "Business logic flaws",
               requires=("has_commerce",), category="logic",
               tools=()),
+
+    # ── Code-execution class ──
+    # Added after the AutoPenBench gate (arXiv:2410.03225). Five of the
+    # twelve exploits named in its real-world CVE tasks imply remote code
+    # execution — geoserver_unauth_rce, spring4shell, log4shell_scanner,
+    # bludit_upload_images_exec, apache_druid_js_rce — and the catalogue had
+    # no technique for it. `config_review` was the nearest bucket and it is
+    # the wrong claim: "a RCE exists here" is a distinct testable assertion
+    # from "this host is misconfigured". Conflating them flags every
+    # CVE-bearing target, which is the flag-everything failure this whole
+    # module exists to prevent.
+    Technique("command_injection", "OS command injection",
+              requires=("has_shell_output",), category="execution",
+              tools=("commix",), cwe="CWE-78",
+              owasp_top10_2025="A05:2025"),
+    Technique("rce", "Remote code execution",
+              requires=("has_code_execution_path",), category="execution",
+              tools=("metasploit",), cwe="CWE-94",
+              owasp_top10_2025="A05:2025"),
+    Technique("path_traversal", "Path traversal / arbitrary file read",
+              requires=("has_file_access",), category="file",
+              tools=("ffuf",), cwe="CWE-22",
+              owasp_top10_2025="A01:2025"),
 )
 
 
@@ -210,6 +233,9 @@ def _predicate_registry() -> dict[str, Callable[[Mapping[str, object]], bool]]:
         "has_cors": lambda f: _has_any(f, "has_cors"),
         "has_state_transitions": lambda f: _has_any(f, "has_state_transitions"),
         "has_commerce": lambda f: _has_any(f, "has_commerce"),
+        "has_shell_output": lambda f: _has_any(f, "has_shell_output"),
+        "has_code_execution_path": lambda f: _has_any(f, "has_code_execution_path"),
+        "has_file_access": lambda f: _has_any(f, "has_file_access"),
     }
 
 
@@ -307,25 +333,36 @@ PRESET_PROFILES: tuple[TargetProfile, ...] = (
         "has_relational_db": True, "has_reflected_input": True,
         "has_persisted_input": True, "has_object_ids": True,
         "has_session_auth": True, "has_cors": True, "has_commerce": True,
+        "has_file_access": True, "has_shell_output": True,
     }),
     TargetProfile("rest_api_jwt", facts={
         "has_network_surface": True, "uses_jwt": True,
         "has_object_ids": True, "has_role_model": True,
         "has_relational_db": True, "makes_server_requests": True,
+        "has_shell_output": True,
     }),
     TargetProfile("file_upload_service", facts={
         "has_network_surface": True, "has_upload": True,
         "makes_server_requests": True, "accepts_xml": True,
         "has_templating": True, "has_login": True,
+        "has_deserialization": True, "has_file_access": True,
+        "has_code_execution_path": True,
     }),
     TargetProfile("soap_legacy", facts={
         "has_network_surface": True, "accepts_xml": True,
         "has_deserialization": True, "has_login": True,
-        "has_relational_db": True,
+        "has_relational_db": True, "has_code_execution_path": True,
     }),
     TargetProfile("nosql_api", facts={
         "has_network_surface": True, "uses_nosql": True,
         "has_object_ids": True, "has_login": True,
+    }),
+    TargetProfile("vulnerable_web_service", facts={
+        # Models the AutoPenBench real-world CVE shape: a dated, exposed
+        # product version. This is where RCE becomes applicable.
+        "has_network_surface": True, "has_login": True,
+        "has_file_access": True, "has_shell_output": True,
+        "has_code_execution_path": True, "has_reflected_input": True,
     }),
     TargetProfile("minimal_static", facts={}),
 )

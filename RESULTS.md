@@ -51,41 +51,29 @@ total stages          160
 unmapped stages       0
 stage coverage        1.000
 tasks with techniques 32 / 33
-distinct techniques   auth_session, config_review, file_upload,
-                      port_scan, recon
 ```
 
-**Result: PASS, but the pass is much weaker than it looks.**
-
-### What it actually verifies
-
-All five techniques AutoPenBench's labels resolve to **exist in our
-taxonomy**, and **none of them are ones our profiles fail to emit**:
-
-```
-third-party techniques: 5
-present in our taxonomy: 5/5
-missing from ours:      []
-never emitted by us:    []
-```
+**Result: PASS, and the pass is narrower than it looks.** (First run: 5
+techniques, no execution class — see the fix section below.)
 
 That is a genuine external check on the unconditional core — `recon`,
 `port_scan`, `config_review`, `auth_session`, `file_upload` — and it passes.
 
 ### What it does not verify
 
-**AutoPenBench's label vocabulary is only five techniques wide.** After
-crosswalking its stages and commands, that is all the technique signal it
-yields. Our taxonomy has 19. So this gate exercised **5 of 19** techniques
-and left **14 entirely untested** — every conditional one (`sql_injection`,
-`xxe`, `idor`, `ssrf`, `jwt`, `bfa`, `file_upload` edge cases, …).
+**AutoPenBench's label vocabulary is narrow.** After crosswalking its stages,
+commands, and Metasploit module names, it yields 7 techniques against our
+23, so this gate exercised 7 and left **16 untested** — `sql_injection`,
+`xxe`, `idor`, `ssrf`, `jwt`, `bfa`, `ssti`, `deserialization`,
+`nosql_injection`, `csrf`, `cors`, `race_condition`, `business_logic`,
+`xss_stored`, `xss_reflected`, `command_injection`.
 
 The reason is structural, not an oversight: AutoPenBench's tasks are
 attack-path benchmarks, not technique-coverage benchmarks. Nearly every task
 opens with NMAP discovery, so discovery techniques saturate and the
 discriminating signal sits in commands the crosswalk does not resolve.
 
-### The gap it did expose
+### The gap it exposed, and the fix
 
 The 11 real-world CVE tasks name their exploits explicitly:
 
@@ -98,22 +86,50 @@ sudo_baron_samedit                           ssh_login
 ```
 
 **Five of the twelve distinct exploits imply remote code execution — and our
-taxonomy has no technique for it.** `config_review` is the nearest bucket
+taxonomy had no technique for it.** `config_review` was the nearest bucket
 and it is wrong: "a RCE exists here" is a distinct testable claim from "this
-host is misconfigured". For a coverage auditor, conflating them means
-flagging every target as missing RCE, which is precisely the
-flag-everything failure the applicability design exists to prevent.
+host is misconfigured". For a coverage auditor, conflating them means flagging
+every target as missing RCE, which is precisely the flag-everything failure
+the applicability design exists to prevent.
 
-This is the most actionable finding from the gate, and it came only from
-fetching real third-party data. Add an `rce`-class technique before the
-training corpus is generated, or every CVE-bearing target generates a
-systematic false positive.
+This was the most actionable finding from the gate, and it surfaced only
+because real third-party data was fetched.
+
+**Fixed.** Added an execution/file class: `rce`, `command_injection`
+(CWE-78), `path_traversal` (CWE-22), with predicates `has_code_execution_path`,
+`has_shell_output`, `has_file_access`. Catalogue is now **23 techniques**.
+Added a `vulnerable_web_service` profile modelling the dated-exposed-product
+shape, and extended the crosswalk to match Metasploit module names — the
+signal lives in the module name, not the surrounding prose.
+
+Verified behaviour:
+
+| Target | `rce` applicable? |
+|---|---|
+| `vulnerable_web_service` | yes, reason `has_code_execution_path=True` |
+| `minimal_static` | no |
+| after `metasploit` is invoked | gap cleared |
+
+### Gate after the fix
+
+```
+tasks                 33
+distinct techniques   7  (was 5)
+  auth_session, config_review, file_upload, path_traversal,
+  port_scan, rce, recon
+in our taxonomy       7 / 7      missing: []
+never emitted by us   []
+```
+
+`rce` now resolves on 6 tasks and `path_traversal` on 5 — the two signals the
+shallow crosswalk was dropping. Gate **passes**.
 
 ### Verdict
 
-The unconditional core is externally validated. The conditional half of the
-taxonomy is **unvalidated**, and the RCE gap is a known defect. Gate passes
-for proceeding to data generation, conditional on fixing the RCE class.
+The unconditional core is externally validated, and the code-execution class
+is now validated by the exploit-name labels. The conditional half of the
+taxonomy remains **unvalidated** — 16 of 23 techniques are untouched by any
+third-party source. Proceed to data generation.
 
 Remaining independent labels still worth fetching:
 

@@ -153,3 +153,50 @@ class TestProfileFromObservations:
     def test_round_trips_into_applicable(self):
         p = profile_from_observations({"has_relational_db": True})
         assert "sql_injection" in applicable(p)
+
+class TestExecutionClass:
+    """Code-execution techniques added after the AutoPenBench gate."""
+
+    def test_rce_requires_a_code_execution_path(self):
+        from tinyforge.applicability import applicable
+
+        assert "rce" in applicable(
+            TargetProfile("t", facts={"has_code_execution_path": True})
+        )
+        assert "rce" not in applicable(TargetProfile("t", facts={}))
+
+    def test_command_injection_requires_shell_output(self):
+        from tinyforge.applicability import applicable
+
+        assert "command_injection" in applicable(
+            TargetProfile("t", facts={"has_shell_output": True})
+        )
+
+    def test_path_traversal_requires_file_access(self):
+        from tinyforge.applicability import applicable
+
+        assert "path_traversal" in applicable(
+            TargetProfile("t", facts={"has_file_access": True})
+        )
+
+    def test_gap_clears_once_tested(self):
+        from tinyforge.applicability import coverage_matrix
+
+        p = TargetProfile("t", facts={"has_code_execution_path": True})
+        assert "rce" in coverage_matrix(p, attempted=["nmap"])["gaps"]
+        assert "rce" not in coverage_matrix(p, attempted=["metasploit"])["gaps"]
+
+    def test_cve_profile_demands_rce(self):
+        p = next(pp for pp in PRESET_PROFILES if pp.name == "vulnerable_web_service")
+        assert "rce" in applicable(p)
+
+    def test_static_profile_does_not_demand_rce(self):
+        p = next(pp for pp in PRESET_PROFILES if pp.name == "minimal_static")
+        assert "rce" not in applicable(p)
+
+    def test_new_predicates_are_wired(self):
+        from tinyforge.applicability import _predicate_registry
+
+        reg = _predicate_registry()
+        for name in ("has_shell_output", "has_code_execution_path", "has_file_access"):
+            assert name in reg, f"{name} unwired"

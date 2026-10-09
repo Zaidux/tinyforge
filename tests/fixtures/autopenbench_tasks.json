@@ -611,7 +611,8 @@
   "techniques": [
    "recon",
    "port_scan",
-   "config_review"
+   "config_review",
+   "rce"
   ],
   "unmapped_stages": [],
   "source_url": "https://github.com/lucagioacchini/auto-pen-bench/tree/main/benchmark/milestones/command_milestones/real-world/cve/vm0.txt"
@@ -642,7 +643,8 @@
   "techniques": [
    "recon",
    "port_scan",
-   "config_review"
+   "config_review",
+   "path_traversal"
   ],
   "unmapped_stages": [],
   "source_url": "https://github.com/lucagioacchini/auto-pen-bench/tree/main/benchmark/milestones/command_milestones/real-world/cve/vm1.txt"
@@ -672,7 +674,8 @@
   "techniques": [
    "recon",
    "port_scan",
-   "config_review"
+   "config_review",
+   "path_traversal"
   ],
   "unmapped_stages": [],
   "source_url": "https://github.com/lucagioacchini/auto-pen-bench/tree/main/benchmark/milestones/command_milestones/real-world/cve/vm10.txt"
@@ -703,7 +706,8 @@
   "techniques": [
    "recon",
    "port_scan",
-   "config_review"
+   "config_review",
+   "rce"
   ],
   "unmapped_stages": [],
   "source_url": "https://github.com/lucagioacchini/auto-pen-bench/tree/main/benchmark/milestones/command_milestones/real-world/cve/vm2.txt"
@@ -738,7 +742,9 @@
   "techniques": [
    "recon",
    "port_scan",
-   "config_review"
+   "config_review",
+   "auth_session",
+   "rce"
   ],
   "unmapped_stages": [],
   "source_url": "https://github.com/lucagioacchini/auto-pen-bench/tree/main/benchmark/milestones/command_milestones/real-world/cve/vm3.txt"
@@ -772,7 +778,8 @@
   "techniques": [
    "recon",
    "port_scan",
-   "config_review"
+   "config_review",
+   "path_traversal"
   ],
   "unmapped_stages": [],
   "source_url": "https://github.com/lucagioacchini/auto-pen-bench/tree/main/benchmark/milestones/command_milestones/real-world/cve/vm4.txt"
@@ -803,7 +810,8 @@
   "techniques": [
    "recon",
    "port_scan",
-   "config_review"
+   "config_review",
+   "path_traversal"
   ],
   "unmapped_stages": [],
   "source_url": "https://github.com/lucagioacchini/auto-pen-bench/tree/main/benchmark/milestones/command_milestones/real-world/cve/vm5.txt"
@@ -834,7 +842,8 @@
   "techniques": [
    "recon",
    "port_scan",
-   "config_review"
+   "config_review",
+   "rce"
   ],
   "unmapped_stages": [],
   "source_url": "https://github.com/lucagioacchini/auto-pen-bench/tree/main/benchmark/milestones/command_milestones/real-world/cve/vm6.txt"
@@ -866,7 +875,8 @@
   "techniques": [
    "recon",
    "port_scan",
-   "config_review"
+   "config_review",
+   "rce"
   ],
   "unmapped_stages": [],
   "source_url": "https://github.com/lucagioacchini/auto-pen-bench/tree/main/benchmark/milestones/command_milestones/real-world/cve/vm7.txt"
@@ -897,7 +907,8 @@
   "techniques": [
    "recon",
    "port_scan",
-   "config_review"
+   "config_review",
+   "rce"
   ],
   "unmapped_stages": [],
   "source_url": "https://github.com/lucagioacchini/auto-pen-bench/tree/main/benchmark/milestones/command_milestones/real-world/cve/vm8.txt"
@@ -927,7 +938,8 @@
   "techniques": [
    "recon",
    "port_scan",
-   "config_review"
+   "config_review",
+   "path_traversal"
   ],
   "unmapped_stages": [],
   "source_url": "https://github.com/lucagioacchini/auto-pen-bench/tree/main/benchmark/milestones/command_milestones/real-world/cve/vm9.txt"

@@ -9,7 +9,9 @@
   "auth_session",
   "config_review",
   "file_upload",
+  "path_traversal",
   "port_scan",
+  "rce",
   "recon"
  ]
 }

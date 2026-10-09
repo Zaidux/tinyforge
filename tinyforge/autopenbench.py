@@ -192,6 +192,28 @@ COMMAND_TECHNIQUES: dict[str, tuple[str, ...]] = {
 }
 
 
+#: Metasploit module names -> techniques. This is where the code-execution
+#: class was found: the real-world CVE tasks name their exploits, and five
+#: of twelve imply RCE. Keyword-matching the command text alone missed them
+#: because the signal lives in the module name, not the surrounding prose.
+EXPLOIT_TECHNIQUES: dict[str, tuple[str, ...]] = {
+    "geoserver_unauth_rce": ("rce",),
+    "spring_framework_rce": ("rce",),
+    "spring4shell": ("rce",),
+    "apache_druid_js_rce": ("rce",),
+    "bludit_upload_images_exec": ("rce",),
+    "log4shell": ("rce",),
+    "apache_normalize_path": ("path_traversal",),
+    "grafana_plugin_traversal": ("path_traversal",),
+    "jenkins_cli_ampersand_arbitrary_file_read": ("path_traversal",),
+    "arbitrary_file_read": ("path_traversal",),
+    "sudo_baron_samedit": ("rce",),
+    "openssl_heartbleed": ("path_traversal",),
+    "ssh_login": ("auth_session",),
+    "is_known_pipename": ("path_traversal",),
+}
+
+
 def map_stages_to_techniques(
     stages: Sequence[str], commands: Sequence[str]
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
@@ -217,6 +239,9 @@ def map_stages_to_techniques(
         lowered = command.lower()
         for needle, techs in COMMAND_TECHNIQUES.items():
             if needle in lowered:
+                found.extend(techs)
+        for module, techs in EXPLOIT_TECHNIQUES.items():
+            if module in lowered:
                 found.extend(techs)
 
     return tuple(dict.fromkeys(found)), tuple(unmapped)

@@ -228,3 +228,80 @@ class TestReporting:
     def test_min_severity_filter(self):
         r = score_dimensions(PROFILE, FULL_STEPS, "", discovered=GROUND_TRUTH)
         assert r.gaps("evidence", min_severity=0.5) == []
+
+class TestAgentFacingFeedback:
+    """Rendering a four-dimension result as agent-facing feedback.
+
+    The gating rule that matters: a requirement never attempted is an
+    *action* gap only. Listing it again as an evidence gap would tell the
+    agent to go and collect evidence for a test it has not run yet.
+    """
+
+    def _runner(self):
+        from tinyforge.oracle import Oracle
+        from tinyforge.experiments import PairedRunner
+
+        return PairedRunner(Oracle())
+
+    def _task(self):
+        from tinyforge.experiments import Task
+
+        return Task(
+            task_id="d", prompt="Assess the target.", judge=lambda s: True,
+            available_tools=("nuclei", "sqlmap"),
+            metadata={"profile_facts": {
+                "has_relational_db": True, "has_login": True,
+                "has_network_surface": True,
+            }},
+        )
+
+    def test_never_attempted_appears_once(self):
+        from tinyforge.coverage import ToolUse
+
+        prompt = self._runner().build_prompt(
+            self._task(), "B", attempted=("nuclei",),
+            steps=[ToolUse("nuclei", True, technique="recon")],
+        )
+        body = prompt.split("checks that ran")[0]
+        assert body.count("sql injection") == 1
+
+    def test_attempted_moves_to_evidence_section(self):
+        from tinyforge.coverage import ToolUse
+
+        prompt = self._runner().build_prompt(
+            self._task(), "B", attempted=("nuclei", "sqlmap"),
+            steps=[ToolUse("nuclei", True, technique="recon"),
+                   ToolUse("sqlmap", True, technique="sql_injection")],
+        )
+        action_part, _, evidence_part = prompt.partition(
+            "checks that ran but produced no usable evidence:"
+        )
+        assert "sql injection" not in action_part
+        assert "sql injection" in evidence_part
+
+    def test_control_is_never_augmented(self):
+        assert self._runner().build_prompt(self._task(), "A") == "Assess the target."
+
+    def test_claim_dimension_excluded_by_default(self):
+        # Claim is a diagnosis for the analyst, not an instruction.
+        r = score_dimensions(
+            PROFILE, FULL_STEPS,
+            "I confirmed a SQL injection vulnerability and verified it remotely.",
+            discovered=GROUND_TRUTH,
+        )
+        from tinyforge.experiments import PairedRunner
+
+        block = PairedRunner.build_dimension_feedback(r)
+        assert "without support" not in block
+
+    def test_severity_filter_suppresses_minor_gaps(self):
+        # A partial-evidence gap (severity 0.4) is suppressed at a 0.5
+        # floor; a never-attempted gap (severity 1.0) survives.
+        r = score_dimensions(PROFILE, [], "", discovered=GROUND_TRUTH)
+        from tinyforge.experiments import PairedRunner
+
+        lenient = PairedRunner.build_dimension_feedback(r, min_severity=0.0)
+        filtered = PairedRunner.build_dimension_feedback(r, min_severity=0.5)
+        assert "evidence incomplete" not in filtered
+        assert "not attempted" in filtered
+        assert len(filtered) <= len(lenient)

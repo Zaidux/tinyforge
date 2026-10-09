@@ -100,6 +100,11 @@ class ToolUse:
     ok: bool
     #: Coarse phase label, e.g. "recon", "exploit", "report".
     phase: str = ""
+    #: Technique this call addressed, when the execution environment records
+    #: it. Resolves the tool-attribution ambiguity that eight techniques
+    #: sharing ``curl`` would otherwise leave unresolved — see
+    #: :mod:`tinyforge.dimensions`.
+    technique: str = ""
 
 
 #: Phase ordering, used to detect "stuck in one phase" gaps.

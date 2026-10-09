@@ -133,10 +133,17 @@ class TestPairedRunner:
         result = runner.run([self._task()], conditions=("A", "B"))
         assert len(result.trials) == 2
         assert oracle.calls[0] != oracle.calls[1]
-        assert "coverage audit" in oracle.calls[1].lower()
-        # sqlmap is required and was never mentioned in the baseline, so the
-        # audit must flag it rather than the tools already in use.
-        assert "sqlmap" in oracle.calls[1]
+        # Four-dimension feedback, not the old flat blind-spot list.
+        assert "before finalising, review these" in oracle.calls[1].lower()
+        # This task declares no profile facts, so only unconditional
+        # techniques apply. sql_injection is correctly NOT flagged - it is
+        # inapplicable, and a checker that flagged it would be crying wolf.
+        assert "sql injection" not in oracle.calls[1].lower()
+        # Action and evidence gaps are labelled separately.
+        assert "checks not performed" in oracle.calls[1].lower()
+        assert "checks that ran but produced no usable evidence" in oracle.calls[1].lower()
+        # recon is applicable but was never run.
+        assert "recon" in oracle.calls[1].lower()
 
     def test_treatment_without_tools_is_unchanged(self):
         t = Task(task_id="x", prompt="p", judge=lambda _: True)

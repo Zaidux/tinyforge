@@ -42,6 +42,8 @@ from dataclasses import dataclass, field
 from typing import Callable, Iterable, Sequence
 
 from .blindspot import BlindSpotDetector, BlindSpotReport
+from .coverage import ToolUse
+from .dimensions import Status
 from .oracle import Oracle
 
 __all__ = [
@@ -77,6 +79,8 @@ class Task:
     techniques: dict[str, tuple[str, ...]] = field(default_factory=dict)
     #: Prose from the trajectory, used for ungrounded-claim detection.
     reference_notes: str = ""
+    #: tool name -> technique id, as recorded by the execution environment.
+    techniques_attributed: dict = field(default_factory=dict)
     metadata: dict = field(default_factory=dict)
 
 
@@ -192,6 +196,67 @@ class PairedRunner:
         self.max_tokens = max_tokens
         self.include_spots_in_prompt = include_spots_in_prompt
 
+    # ── Four-dimension reporting ──────────────────────────────────────────
+
+    @staticmethod
+    def build_dimension_feedback(
+        result,
+        *,
+        dimensions: Sequence[str] = ("action", "evidence"),
+        min_severity: float = 0.5,
+        max_items: int = 4,
+    ) -> str:
+        """Render a four-dimension result as agent-facing feedback.
+
+        Only *action* and *evidence* are surfaced by default. ``claim`` is a
+        diagnosis for the analyst, not an instruction to the agent, and
+        ``outcome`` is usually unassessable — including either would either
+        waste the agent's turns or inject noise.
+
+        Severity is filtered rather than everything being listed, because a
+        feedback block listing all eight gaps gets ignored by the agent and
+        by the analyst alike. Partial credit is not worth flagging.
+        """
+        if not result.gaps("action") and not result.gaps("evidence"):
+            return ""
+
+        parts: list[str] = []
+        for dim in dimensions:
+            items = [
+                (req, result._dim(dim)[req])
+                for req in result.gaps(dim)
+                if result._dim(dim)[req].severity >= min_severity
+                # A requirement that was never attempted is an *action*
+                # gap only. Listing it again as an evidence gap would tell
+                # the agent to go and collect evidence for a test it has not
+                # run yet.
+                and not (dim == "evidence" and result.action[req].status
+                         is Status.NOT_ATTEMPTED)
+            ][:max_items]
+            if not items:
+                continue
+            label = {
+                "action": "checks not performed",
+                "evidence": "checks that ran but produced no usable evidence",
+                "claim": "findings asserted without support",
+                "outcome": "applicable findings not discovered",
+            }.get(dim, dim)
+            parts.append(f"  {label}:")
+            for req, score in items:
+                hint = {
+                    "not_attempted": "not attempted",
+                    "attempted_no_evidence": "no evidence recorded",
+                    "evidence_partial": "evidence incomplete",
+                }.get(score.status.value, score.status.value)
+                parts.append(f"    - {req.replace('_', ' ')} ({hint})")
+
+        if not parts:
+            return ""
+        return (
+            "\nBefore finalising, review these. They apply to this target "
+            "based on what you observed:\n" + "\n".join(parts)
+        )
+
     # ── Prompt assembly ───────────────────────────────────────────────────
 
     @staticmethod
@@ -214,6 +279,7 @@ class PairedRunner:
         condition: str,
         *,
         attempted: Iterable[str] = (),
+        steps: Sequence[ToolUse] | None = None,
     ) -> str:
         """Assemble the prompt for *condition*.
 
@@ -222,12 +288,36 @@ class PairedRunner:
         abstain, which would silently make arms B and C identical to A and
         measure nothing at all. The two-phase design in :meth:`run` exists
         for this reason.
+
+        When *steps* is supplied the four-dimension scorer produces the
+        feedback instead of the flat blind-spot list, so evidence gaps and
+        action gaps are distinguished in what the agent is told.
         """
         prompt = task.prompt
         if condition == "A":
             return prompt
         if not task.available_tools:
             return prompt
+
+        if steps is not None:
+            from .dimensions import Status, Step, score_dimensions
+
+            profile = self._profile_for(task)
+            # Requirements come from the catalogue, not from the legacy
+            # TECHNIQUES map — their ids differ, and passing the wrong
+            # vocabulary here makes the scorer score nothing.
+            from .applicability import CATALOGUE
+
+            result = score_dimensions(
+                profile,
+                [Step(tool=u.name, ok=u.ok, evidence_digest="", technique=u.technique)
+                 for u in steps],
+                narrative="",
+                requirements=sorted(t.id for t in CATALOGUE),
+            )
+            block = self.build_dimension_feedback(result)
+            return f"{prompt}{block}" if block else prompt
+
         report = self.detector.detect(
             attempted=attempted,
             available=task.available_tools,
@@ -237,6 +327,21 @@ class PairedRunner:
         )
         block = self._format_spots(report)
         return f"{prompt}{block}" if block else prompt
+
+    def _profile_for(self, task: Task):
+        """Best-effort target profile for a task.
+
+        Uses explicit ``profile_facts`` when the task carries them. When it
+        does not, every requirement is treated as applicable — which
+        over-flags rather than under-flags. That is the safe direction given
+        false positives are the damaging error, but it is a real limitation:
+        a proper profile needs observed facts, and synthesising them here
+        would be guessing.
+        """
+        from .applicability import TargetProfile
+
+        facts = task.metadata.get("profile_facts") or {}
+        return TargetProfile(task.task_id, facts=dict(facts))
 
     @staticmethod
     def infer_attempted(text: str, available: Iterable[str]) -> tuple[str, ...]:
@@ -252,9 +357,10 @@ class PairedRunner:
     # ── Execution ─────────────────────────────────────────────────────────
 
     def run_task(
-        self, task: Task, condition: str, *, attempted: Iterable[str] = ()
+        self, task: Task, condition: str, *, attempted: Iterable[str] = (),
+        steps: Sequence[ToolUse] | None = None,
     ) -> Trial:
-        prompt = self.build_prompt(task, condition, attempted=attempted)
+        prompt = self.build_prompt(task, condition, attempted=attempted, steps=steps)
         started = time.perf_counter()
         resp = self.oracle.complete(prompt, max_tokens=self.max_tokens)
         passed = False
@@ -301,14 +407,22 @@ class PairedRunner:
 
         baseline = {t.task_id: t.output for t in trials}
 
-        # Phase 2 — treatments, informed by the baseline.
+        # Phase 2 — treatments, informed by the baseline. Steps are
+        # reconstructed so the four-dimension scorer can distinguish "never
+        # ran" from "ran with no evidence".
         for task in tasks:
             attempted = self.infer_attempted(
                 baseline.get(task.task_id, ""), task.available_tools
             )
+            steps = [
+                ToolUse(name=t, ok=True, technique=task.techniques_attributed.get(t, ""))
+                for t in attempted
+            ]
             for condition in treatment_conds:
                 trials.append(
-                    self.run_task(task, condition, attempted=attempted)
+                    self.run_task(
+                        task, condition, attempted=attempted, steps=steps
+                    )
                 )
                 if progress:
                     progress(len(trials), len(tasks) * max(len(conds), 1))

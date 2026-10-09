@@ -178,3 +178,68 @@ fault:
 
 Items 1–3 are genuine predicate errors and the clearest next fix. Item 4 is
 a data-collection bug. Item 5 is a missing observation.
+---
+
+## Widening target coverage (2026-10-09)
+
+The residual misses were a **recon** problem, not a predicate problem, so
+the fix was better evidence rather than more rules.
+
+### recon.py — specifications as evidence
+
+An API specification is better than anything we invent: authored by the
+application, enumerating real endpoints, stating the auth scheme. Parsed
+from Juice Shop's own `swagger.yml` (NextGen B2B API), saved to
+`annotations/specs/`.
+
+It resolved the fact four inter-judge disagreements turned on:
+
+```
+bearerAuth: http / bearer / JWT   →  has_header_auth = True
+                                     has_cookie_auth = False
+```
+
+That is exactly what could not be inferred from our previous observations,
+and it matters: **header-borne auth makes CSRF inapplicable and makes CORS
+the relevant concern.** Getting it wrong manufactures both a false positive
+and a false negative.
+
+Two bugs found by building it:
+
+- **Component schemas were never walked.** Only `paths` was traversed, so
+  every identifier living in a named `$ref` schema was invisible — which in
+  a real specification is most of them.
+- **Object references keyed by a body field were undetectable.** The signal
+  only matched numeric path segments, so `productId` in a request body set
+  no fact. That is the common shape for order and product APIs.
+
+### The new target: `js-b2b`
+
+| | |
+|---|---|
+| Source | `juice-shop/swagger.yml`, NextGen B2B API |
+| Declared paths | `/orders` (POST) |
+| Auth | bearer JWT, **header-borne** |
+| Body fields | `productId` (integer), `quantity` (min 1), `cid`, `orderNo`, `paymentDue` |
+
+Our checker proposes on this surface:
+
+```
+config_review, cors, jwt, nosql_injection, port_scan, recon,
+sql_injection, xss_stored
+```
+
+`business_logic` and `race_condition` are **not** proposed, and that is a
+genuine miss: an order endpoint carrying `quantity` with a stated minimum
+and a `paymentDue` date is a textbook state-transition surface. Our
+predicate for `has_state_transitions` requires an observed fact naming
+concurrency or state, which a spec does not state.
+
+That is the next concrete gap, and it is now *specific* rather than
+speculative — which is what wider coverage was supposed to buy.
+
+### What has not changed
+
+The three original targets and their 69 judgements are untouched, and the
+measured result still stands: over-flag 0.000, recall 0.77 / 0.73. `js-b2b`
+has not been judged, so nothing has been scored against it.

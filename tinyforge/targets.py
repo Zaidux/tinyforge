@@ -94,7 +94,15 @@ FACT_SIGNALS: dict[str, tuple[tuple[str, str], ...]] = {
     ),
     "has_object_ids": (
         (r"/\d+(\b|$|\?|#)", "numeric identifier in an endpoint"),
-        (r"\b(id|uuid|order_id|user_id|objectid)\b", "identifier parameter"),
+        # Identifier-shaped field names in a body or query parameter. These
+        # are how object references appear in an API that keys its objects by
+        # a body field rather than a path segment, which the path pattern
+        # above cannot see.
+        (r"\b(id|uuid|order_id|orderid|user_id|userid|objectid|product_id|"
+         r"productid|cid|customer_id|invoice_id|file_id|token)\b",
+         "identifier parameter"),
+        # An integer-typed property named like a resource key.
+        (r"\b\w+Id\b", "camelCase identifier parameter"),
     ),
     "has_role_model": (
         (r"\b(admin|role|permission|privilege|isadmin)\b", "role concept present"),

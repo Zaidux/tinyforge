@@ -9,3 +9,5 @@ data/cache/
 .venv/
 data/raw/
 data/processed/
+annotations/*.json
+!annotations/README.md

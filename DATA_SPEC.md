@@ -28,8 +28,9 @@ would.
 | 3 | Coverage + blind-spot + hallucination detectors | — ✅ done |
 | 4 | Oracle backend, paired A/B harness | — ✅ done |
 | 5 | **Applicability function** | — ✅ done |
-| 6 | **Constrained task prompts + baseline A/B** | ⏳ next |
-| 7 | **Null-scorer baseline run** | phase 6 |
+| 6 | **Paired A/B harness + constrained prompts** | — ✅ done |
+| 7 | **Gate vs third-party labels** | — ✅ 7 of 23 techniques |
+| 7b | **Widen gate coverage** | ⏳ running |
 | 8 | **Data generation** | phase 7 |
 | 9 | Model training | phase 7, 8 |
 | 10 | Scaled A/B, Pareto report | phase 9 |
@@ -37,6 +38,10 @@ would.
 Phase 8 is data generation. It is gated on phase 7 deliberately: if the
 deterministic rules do not move the metric, a trained model will not either,
 and generating 120k examples to learn that would be waste.
+
+**Phase 7 outcome:** the gate passes but covers only 7 of 23 techniques.
+The RCE class it exposed is fixed. 16 techniques remain unvalidated and
+phase 7b is running to widen coverage.
 
 ## Record schema
 

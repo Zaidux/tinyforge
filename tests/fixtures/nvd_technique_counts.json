@@ -1,0 +1,1 @@
+{"sql_injection": 200, "command_injection": 200, "rce": 200, "path_traversal": 200, "xss_reflected": 200, "ssrf": 200, "xxe": 200, "deserialization": 200, "csrf": 200, "file_upload": 200, "ssti": 4, "idor": 200, "bfa": 200, "jwt": 200, "cors": 0, "race_condition": 200, "auth_session": 200, "config_review": 200}

@@ -124,12 +124,77 @@ never emitted by us   []
 `rce` now resolves on 6 tasks and `path_traversal` on 5 — the two signals the
 shallow crosswalk was dropping. Gate **passes**.
 
+## Phase 7b — widening the gate with NVD
+
+Two candidate sources were fetched. **One was rejected on evidence.**
+
+### CyberGym — rejected
+
+`sunblaze-ucb/cybergym` has 1,507 rows and looks ideal. It is not:
+
+```
+languages: c++ 1276, c 228, rust 2, swift 1
+classifiable against our technique vocabulary: 2 / 1507
+```
+
+It is a **code**-vulnerability benchmark, not a web/API attack benchmark —
+which the data-gap research predicted ("the Top 25 is dominated by
+memory-safety CWEs which barely apply to a web pentest agent"). Recorded
+rather than deleted; the negative result is the useful part.
+
+### NVD — adopted
+
+Queried per-CWE (`?cweId=CWE-89` etc.) rather than by recency, because a
+recent-CVE sample has no CWE attached 94% of the time and would have been
+worthless.
+
+```
+techniques_total              23
+techniques_with_cve_evidence  17
+```
+
+Every major technique clears 200 real CVEs: `sql_injection`,
+`command_injection`, `rce`, `path_traversal`, `xss_reflected`, `ssrf`, `xxe`,
+`deserialization`, `csrf`, `file_upload`, `idor`, `bfa`, `jwt`,
+`race_condition`, `auth_session`, `config_review`. `ssti` has 4.
+
+### What this validates — and what it does not
+
+NVD validates that a technique is a **real class occurring in the wild**, not
+that our applicability function decides when to test it. A technique with
+zero real CVEs would be one we invented. That is now checked for 17 of 23.
+
+It does **not** validate applicability. NVD says "SQL injection is real";
+it never says "SQL injection applies to *this* target". That remains
+deterministic and internally specified.
+
+### Techniques with no CVE evidence, and why that is correct
+
+| Technique | Why |
+|---|---|
+| `recon`, `port_scan` | Not vulnerability classes — no CVE exists. Validated by AutoPenBench. |
+| `business_logic` | Real but rarely assigned a specific CWE |
+| `nosql_injection` | Query `?cweId=CWE-943` returns empty; CWE-943 is not NVD-indexed |
+| `cors` | CWE-942 returns zero NVD records despite being a real class |
+| `xss_stored` | Distinct from `xss_reflected` (CWE-79) in our model; shares that CWE upstream |
+
+The last three are **known blind spots in our own taxonomy**, not evidence
+that the techniques are fake. They are flagged, not swept up.
+
 ### Verdict
 
-The unconditional core is externally validated, and the code-execution class
-is now validated by the exploit-name labels. The conditional half of the
-taxonomy remains **unvalidated** — 16 of 23 techniques are untouched by any
-third-party source. Proceed to data generation.
+| Aspect | Status |
+|---|---|
+| Technique taxonomy is real classes | **17 of 23 externally evidenced** |
+| Unconditional core (recon, port_scan) | **validated** (AutoPenBench) |
+| Code-execution class | **validated** (AutoPenBench exploit names) |
+| `sql_injection`, `xxe`, `idor`, `jwt`, … | **validated as real classes** (NVD) |
+| **Applicability function** | **unvalidated** — no source tests it |
+
+The gate is wide now, but its load-bearing weakness has not moved:
+**nothing yet tests whether applicability is correct.** Only a labelled set
+of *per-target* technique expectations could, and none of these sources is
+that. Proceed to data generation with that limitation stated.
 
 Remaining independent labels still worth fetching:
 

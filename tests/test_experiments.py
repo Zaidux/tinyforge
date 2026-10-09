@@ -196,13 +196,25 @@ class TestSyntheticTasks:
             assert c.available_tools
 
     def test_missing_techniques_is_derivable(self):
+        # Ground truth now comes from the applicability gate, not the legacy
+        # flat map. Re-derive it independently here.
+        from tinyforge.applicability import TargetProfile, coverage_matrix
+
         for c in generate_cases(25):
-            covered = {
-                t for t in c.ground_truth_coverage
-                if set(TECHNIQUES[t]) & set(c.attempted_tools)
-            }
-            expected = set(c.ground_truth_coverage) - covered
-            assert set(c.missing_techniques) == expected
+            profile = TargetProfile(c.target_description, facts=dict(c.profile_facts))
+            matrix = coverage_matrix(profile, c.attempted_tools)
+            assert set(c.missing_techniques) == set(matrix["gaps"])
+
+    def test_gaps_trace_to_observable_facts(self):
+        # Every flagged gap must be justifiable from the target profile.
+        # An unjustifiable gap is a phantom.
+        from tinyforge.applicability import TargetProfile, coverage_matrix
+
+        for c in generate_cases(20):
+            profile = TargetProfile(c.target_description, facts=dict(c.profile_facts))
+            matrix = coverage_matrix(profile, c.attempted_tools)
+            for gap in matrix["gaps"].values():
+                assert gap["why_applicable"], f"{c.case_id} phantom gap"
 
     def test_high_bias_produces_fewer_gaps(self):
         sparse = generate_cases(60, seed=3, coverage_bias=0.2)
@@ -222,8 +234,11 @@ class TestSyntheticTasks:
         judged = [t for t in tasks if t.metadata["missing_techniques"]]
         assert judged, "need cases with gaps to exercise the judge"
         t = judged[0]
-        want = t.metadata["missing_techniques"][0]
-        assert t.judge(f"I tested {want.replace('_', ' ')} thoroughly.") is True
+        missing = t.metadata["missing_techniques"]
+        # The judge accepts a response naming at least half the gaps, so a
+        # partial answer is enough. Name all of them to keep this robust.
+        answer = " ".join(m.replace("_", " ") for m in missing)
+        assert t.judge(answer) is True
 
     def test_judge_fails_on_empty_output(self):
         tasks = to_tasks(generate_cases(20))

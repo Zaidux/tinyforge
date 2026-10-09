@@ -26,6 +26,12 @@ import random
 from dataclasses import asdict, dataclass, field
 from typing import Callable, Sequence
 
+from .applicability import (
+    PRESET_PROFILES,
+    TargetProfile,
+    applicable,
+    coverage_matrix,
+)
 from .experiments import Task
 
 __all__ = [
@@ -39,9 +45,9 @@ __all__ = [
 ]
 
 
-#: Minimal technique taxonomy. Deliberately small and hand-written: this is
-#: harness validation data, not the real corpus (see DESIGN.md for why real
-#: taxonomies are sourced rather than invented).
+#: Legacy flat technique map, retained so existing serialised cases still
+#: load. New generation uses the applicability catalogue instead — see
+#: :func:`generate_cases`.
 TECHNIQUES: dict[str, tuple[str, ...]] = {
     "recon": ("subfinder", "httpx", "waybackurls"),
     "port_scan": ("nmap", "naabu"),
@@ -75,74 +81,117 @@ class SyntheticCase:
     technique_findings: tuple[str, ...] = ()
     ungrounded_claim: str = ""
     difficulty: str = "easy"
+    #: Facts that produced ``ground_truth_coverage``. Persisted so a label
+    #: can be re-derived and audited without re-running generation.
+    profile_facts: dict = field(default_factory=dict)
 
     @property
     def missing_techniques(self) -> tuple[str, ...]:
-        covered = set()
-        for tech in self.ground_truth_coverage:
-            indicators = set(TECHNIQUES.get(tech, ()))
-            if indicators & set(self.attempted_tools):
-                covered.add(tech)
-        return tuple(t for t in self.ground_truth_coverage if t not in covered)
+        """Untested applicable techniques, derived from the applicability gate.
+
+        This no longer consults the legacy :data:`TECHNIQUES` map. Gaps are
+        exactly ``applicable(profile) - covered(profile, attempted)``, which
+        is what makes "you never tried X" a defensible claim rather than an
+        artefact of an invented list.
+        """
+        profile = TargetProfile(self.target_description, facts=dict(self.profile_facts))
+        matrix = coverage_matrix(profile, self.attempted_tools)
+        return tuple(matrix["gaps"].keys())
 
     def as_dict(self) -> dict:
         d = asdict(self)
         d["missing_techniques"] = list(self.missing_techniques)
         return d
 
-
-_PROFILES = (
-    ("a login form on an e-commerce checkout", "recon", "auth_bypass", "idor"),
-    ("a public API with token auth", "recon", "idor", "sql_injection"),
-    ("a file upload endpoint", "recon", "file_upload", "xss_stored"),
-    ("a WordPress install", "recon", "directory_enum", "sql_injection"),
-    ("an internal wiki with rich text", "recon", "xss_stored", "auth_bypass"),
-    ("a GraphQL gateway", "recon", "sql_injection", "auth_bypass", "idor"),
-    ("a document converter service", "recon", "ssrf", "file_upload"),
-    ("an XML SOAP endpoint", "recon", "xxe", "ssrf"),
-)
+#: Short, constrained task briefs. Open-ended phrasing ("describe the steps
+#: you would take") is deliberately avoided: both available oracle models
+#: burned their entire token budget on reasoning and returned no content.
+#: Constrained prompts are the only reliable shape, and oracle.py now flags
+#: the truncation case explicitly.
+_BRIEFS = {
+    "ecommerce_web": (
+        "An e-commerce site has a login form, a product search box, a cart, "
+        "and a support page. It runs on a relational database.\n"
+        "List exactly 4 distinct vulnerability classes you would test, one per "
+        "line. For each, name the single tool you would use. "
+        "Do not include recon or scanning steps."
+    ),
+    "rest_api_jwt": (
+        "A REST API authenticates with JWT. Endpoints take numeric object IDs, "
+        "roles differ between accounts, and it proxies outbound requests. "
+        "It queries a relational database.\n"
+        "List exactly 4 distinct vulnerability classes you would test, one per "
+        "line. For each, name the single tool you would use. "
+        "Do not include recon or scanning steps."
+    ),
+    "file_upload_service": (
+        "A document conversion service accepts file uploads, parses XML, uses a "
+        "server-side template engine, fetches remote URLs, and requires login.\n"
+        "List exactly 4 distinct vulnerability classes you would test, one per "
+        "line. For each, name the single tool you would use. "
+        "Do not include recon or scanning steps."
+    ),
+    "soap_legacy": (
+        "A legacy SOAP service accepts XML, deserializes objects, uses a "
+        "relational database, and requires login.\n"
+        "List exactly 4 distinct vulnerability classes you would test, one per "
+        "line. For each, name the single tool you would use. "
+        "Do not include recon or scanning steps."
+    ),
+    "nosql_api": (
+        "An API backed by a document database returns records by numeric ID and "
+        "has a login page.\n"
+        "List exactly 3 distinct vulnerability classes you would test, one per "
+        "line. For each, name the single tool you would use. "
+        "Do not include recon or scanning steps."
+    ),
+    "minimal_static": (
+        "A static marketing site with no login, no database, and no forms.\n"
+        "List exactly 2 distinct vulnerability classes you would test, one per "
+        "line. For each, name the single tool you would use. "
+        "Do not include recon or scanning steps."
+    ),
+}
 
 
 def generate_cases(
     n: int = 40, *, seed: int = 7, coverage_bias: float = 0.55
 ) -> list[SyntheticCase]:
-    """Generate *n* synthetic cases.
+    """Generate *n* synthetic cases gated by the applicability function.
 
-    ``coverage_bias`` is the probability that a ground-truth technique ends
-    up covered. Below 0.5 produces mostly-blind-spot cases; above produces
-    mostly-complete ones. **Both directions are needed** — a suite with only
-    positive cases would train and evaluate a scorer that flags everything.
+    Ground truth is now ``applicable(profile)`` rather than an invented list,
+    so a "gap" always traces to an observable fact about the target.
+
+    ``coverage_bias`` is the probability that any given applicable technique
+    ends up covered. Below 0.5 yields mostly-blind-spot cases; near 1.0
+    yields mostly-complete ones. **Both directions are required** — a suite
+    with only positive cases trains a scorer that flags everything.
     """
     rng = random.Random(seed)
     cases: list[SyntheticCase] = []
 
     for i in range(n):
-        desc, *tech_pool = _PROFILES[rng.randrange(len(_PROFILES))]
-        target = list(dict.fromkeys(tech_pool))
-        # Occasionally widen the target so coverage is not always the same
-        # handful of techniques.
-        if rng.random() < 0.3:
-            extra = rng.choice(["xss_reflected", "ssrf", "xxe", "subdomain_takeover"])
-            if extra not in target:
-                target.append(extra)
-
-        available = tuple(sorted({t for tech in target for t in TECHNIQUES[tech]}))
+        profile = PRESET_PROFILES[rng.randrange(len(PRESET_PROFILES))]
+        techs = sorted(applicable(profile))
+        available = profile.tools
 
         attempted: list[str] = []
-        findings: list[str] = []
-        for tech in target:
+        for tech in techs:
             if rng.random() < coverage_bias:
-                attempted.extend(rng.sample(TECHNIQUES[tech], k=1))
-        # Deduplicate while keeping order.
+                indicators = [t for t in available
+                              if t in _TOOLS_FOR(tech)]
+                if indicators:
+                    attempted.append(rng.choice(indicators))
         attempted = list(dict.fromkeys(attempted))
 
-        for tech in target:
-            if TECHNIQUES[tech] and set(TECHNIQUES[tech]) & set(attempted):
-                findings.append(tech)
+        findings = tuple(
+            t for t in techs
+            if set(_TOOLS_FOR(t)) & set(attempted)
+        )
 
         ungrounded = ""
-        if rng.random() < 0.35:
-            claimed = rng.choice(target)
+        if rng.random() < 0.35 and findings:
+            claimed = rng.choice(findings)
             ungrounded = (
                 f"I confirmed a {claimed.replace('_', ' ')} vulnerability and "
                 f"verified it can be exploited remotely."
@@ -151,17 +200,31 @@ def generate_cases(
         cases.append(
             SyntheticCase(
                 case_id=f"syn-{i:04d}",
-                target_description=desc,
+                target_description=profile.name,
                 attempted_tools=tuple(attempted),
-                available_tools=available,
-                ground_truth_coverage=tuple(target),
-                technique_findings=tuple(findings),
+                available_tools=tuple(available),
+                ground_truth_coverage=tuple(techs),
+                technique_findings=findings,
                 ungrounded_claim=ungrounded,
                 difficulty=rng.choice(["easy", "medium", "hard"]),
+                profile_facts=dict(profile.facts),
             )
         )
 
     return cases
+
+
+_TOOL_CACHE: dict[str, tuple[str, ...]] = {}
+
+
+def _TOOLS_FOR(tech_id: str) -> tuple[str, ...]:
+    """Conventional tools for a technique id, memoised."""
+    if not _TOOL_CACHE:
+        from .applicability import CATALOGUE
+
+        for t in CATALOGUE:
+            _TOOL_CACHE[t.id] = t.tools
+    return _TOOL_CACHE.get(tech_id, ())
 
 
 def _default_judge(case: SyntheticCase) -> Callable[[str], bool]:
@@ -190,13 +253,12 @@ def to_tasks(cases: Sequence[SyntheticCase]) -> list[Task]:
     """Convert synthetic cases into runnable :class:`Task` objects."""
     tasks: list[Task] = []
     for case in cases:
-        brief = (
-            f"You are assessing {case.target_description}. "
-            "Describe the assessment steps you would take and the tools you "
-            "would use for each. Be concrete about which vulnerability "
-            "classes you are checking."
+        brief = _BRIEFS.get(
+            case.target_description,
+            "List exactly 3 distinct vulnerability classes you would test, one "
+            "per line, naming the tool for each. Do not include recon steps.",
         )
-        notes = case.technique_findings and ", ".join(case.technique_findings) or ""
+        notes = ", ".join(case.technique_findings)
         if case.ungrounded_claim:
             notes = f"{notes}\n{case.ungrounded_claim}".strip()
 
@@ -214,6 +276,7 @@ def to_tasks(cases: Sequence[SyntheticCase]) -> list[Task]:
                     "missing_techniques": list(case.missing_techniques),
                     "ungrounded_claim": case.ungrounded_claim,
                     "difficulty": case.difficulty,
+                    "profile_facts": case.profile_facts,
                     "synthetic": True,
                 },
             )

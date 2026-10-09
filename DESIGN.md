@@ -111,6 +111,55 @@ which a 1-core, no-torch box cannot afford in the scoring path.
 The "is this answer right?" case matters most — answering it *is*
 memorization, which is exactly what fails.
 
+## Four-dimension coverage
+
+Collapsing coverage into one number destroys the distinction that makes the
+checker useful. An agent can have perfect action coverage and find nothing,
+or find a critical bug while skipping half the checklist. Both external
+reviews converged on this correction; `dimensions.py` implements it.
+
+| Dimension | Question | Evidenced by | Usually available? |
+|---|---|---|---|
+| `action` | Did the required steps run? | tool-call log | yes |
+| `evidence` | Was usable output collected? | output digests | yes |
+| `claim` | Do findings have support? | narrative vs evidence | yes |
+| `outcome` | Was the finding discovered? | environment ground truth | **rarely** |
+
+**The same status can pass one dimension and fail another.** `sqlmap`
+returning no injection satisfies *action* — the step ran — and fails
+*evidence*, because the analyst learned nothing. A single boolean cannot
+express that.
+
+### Status vocabulary
+
+`NOT_ATTEMPTED` → `ATTEMPTED_NO_EVIDENCE` → `EVIDENCE_PARTIAL` →
+`COMPLETE`, plus two terminal states that are **not** failures:
+
+- `INAPPLICABLE` — does not apply (see `applicability.py`)
+- `RESOLVED` — earlier evidence made the test unnecessary
+
+The second pair matters more than it looks. A checker that treats them as
+gaps punishes good judgement: an agent that discovers a static site has no
+server-side surface does not owe an RCE test. The MSR verifier post
+separates *controllable* from *uncontrollable* failures for the same reason.
+
+### Why outcome is never inferred
+
+`outcome` is the only dimension needing external ground truth, so when it is
+absent it is marked unassessable rather than guessed. Conflating "not
+assessed" with "not satisfied" is the bug the four-way split exists to
+prevent. And a *negative* result on an applicable requirement — tested,
+nothing found — is recorded as satisfied: that is a legitimate outcome, not
+a coverage failure.
+
+### The tool-attribution limit, at requirement granularity
+
+Eight techniques share `curl` as their only conventional tool. A bare `curl`
+invocation therefore cannot establish *which* requirement was addressed, so
+attribution is downgraded rather than asserted. `Step.technique` — a tag the
+execution environment records — resolves it, which is the strongest argument
+yet for reading structured traces rather than free-text narratives.
+
 ## Two design mandates
 
 ### 1. Train contrastively; evaluate false-positive rate, not F1

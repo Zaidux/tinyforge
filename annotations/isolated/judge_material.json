@@ -1,0 +1,404 @@
+{
+ "_README": "Material for an INDEPENDENT applicability judge. Contains only observable facts about each target and a neutral description of each technique. It deliberately contains NO applicability predicates, NO function output, and NO project documentation \u2014 if the judge can see how we decide, its agreement with us is meaningless.",
+ "targets": [
+  {
+   "target_id": "js-full",
+   "application": "juice-shop",
+   "surface": "whole-app",
+   "stack": [
+    "node",
+    "express",
+    "sqlite",
+    "mongodb",
+    "angular"
+   ],
+   "observed_facts": {
+    "has_login": true,
+    "has_relational_db": true,
+    "uses_nosql": true,
+    "uses_jwt": true,
+    "has_object_ids": true,
+    "has_upload": true,
+    "accepts_xml": true,
+    "has_deserialization": true,
+    "has_templating": true,
+    "has_code_execution_path": true
+   },
+   "fact_evidence": {
+    "has_login": [
+     "login endpoint in inventory",
+     "login form in source"
+    ],
+    "has_relational_db": [
+     "relational database fingerprint"
+    ],
+    "uses_nosql": [
+     "document-store fingerprint"
+    ],
+    "uses_jwt": [
+     "JWT library or bearer token reference"
+    ],
+    "has_object_ids": [
+     "numeric identifier in an endpoint"
+    ],
+    "has_upload": [
+     "upload surface observed"
+    ],
+    "accepts_xml": [
+     "XML parser in the dependency tree"
+    ],
+    "has_deserialization": [
+     "serialisation surface",
+     "sandbox or VM deserialisation dependency"
+    ],
+    "has_templating": [
+     "template engine"
+    ],
+    "has_code_execution_path": [
+     "code execution path"
+    ]
+   },
+   "app_documented_techniques": [
+    "auth_session",
+    "bfa",
+    "config_review",
+    "deserialization",
+    "idor",
+    "jwt",
+    "nosql_injection",
+    "rce",
+    "sql_injection",
+    "xss_reflected",
+    "xss_stored",
+    "xxe"
+   ]
+  },
+  {
+   "target_id": "js-api",
+   "application": "juice-shop",
+   "surface": "rest-api",
+   "stack": [
+    "node",
+    "express",
+    "sqlite",
+    "mongodb"
+   ],
+   "observed_facts": {
+    "has_login": true,
+    "has_object_ids": true,
+    "has_upload": true
+   },
+   "fact_evidence": {
+    "has_login": [
+     "login endpoint in inventory",
+     "login form in source"
+    ],
+    "has_object_ids": [
+     "numeric identifier in an endpoint"
+    ],
+    "has_upload": [
+     "upload surface observed"
+    ]
+   },
+   "app_documented_techniques": [
+    "auth_session",
+    "jwt",
+    "idor",
+    "bfa",
+    "sql_injection",
+    "nosql_injection"
+   ]
+  },
+  {
+   "target_id": "js-upload",
+   "application": "juice-shop",
+   "surface": "file-and-xml",
+   "stack": [
+    "node",
+    "express",
+    "sqlite"
+   ],
+   "observed_facts": {
+    "has_relational_db": true,
+    "uses_nosql": true,
+    "uses_jwt": true,
+    "has_upload": true,
+    "accepts_xml": true,
+    "has_deserialization": true,
+    "has_templating": true,
+    "has_code_execution_path": true
+   },
+   "fact_evidence": {
+    "has_relational_db": [
+     "relational database fingerprint"
+    ],
+    "uses_nosql": [
+     "document-store fingerprint"
+    ],
+    "uses_jwt": [
+     "JWT library or bearer token reference"
+    ],
+    "has_upload": [
+     "upload surface observed"
+    ],
+    "accepts_xml": [
+     "XML parser in the dependency tree"
+    ],
+    "has_deserialization": [
+     "serialisation surface",
+     "sandbox or VM deserialisation dependency"
+    ],
+    "has_templating": [
+     "template engine"
+    ],
+    "has_code_execution_path": [
+     "code execution path"
+    ]
+   },
+   "app_documented_techniques": [
+    "file_upload",
+    "xxe",
+    "deserialization",
+    "rce",
+    "path_traversal",
+    "ssti"
+   ]
+  }
+ ],
+ "technique_definitions": [
+  {
+   "id": "recon",
+   "name": "Subdomain and endpoint discovery",
+   "cwe": null,
+   "category": "recon",
+   "conventional_tools": [
+    "subfinder",
+    "httpx",
+    "waybackurls",
+    "katana"
+   ],
+   "what_this_means": "Mapping hosts, subdomains and endpoints before testing."
+  },
+  {
+   "id": "port_scan",
+   "name": "Service and port discovery",
+   "cwe": null,
+   "category": "recon",
+   "conventional_tools": [
+    "nmap",
+    "naabu"
+   ],
+   "what_this_means": "Identifying which network services are listening."
+  },
+  {
+   "id": "config_review",
+   "name": "Security misconfiguration review",
+   "cwe": null,
+   "category": "web",
+   "conventional_tools": [
+    "nikto",
+    "nuclei"
+   ],
+   "what_this_means": "Checking for insecure configuration, missing security headers, default credentials, exposed debug modes."
+  },
+  {
+   "id": "auth_session",
+   "name": "Authentication and session handling",
+   "cwe": null,
+   "category": "auth",
+   "conventional_tools": [
+    "curl"
+   ],
+   "what_this_means": "Testing login, session token issuance, logout, session fixation and account recovery."
+  },
+  {
+   "id": "sql_injection",
+   "name": "SQL injection",
+   "cwe": "CWE-89",
+   "category": "injection",
+   "conventional_tools": [
+    "sqlmap"
+   ],
+   "what_this_means": "Testing whether input reaches a SQL query unparameterised."
+  },
+  {
+   "id": "nosql_injection",
+   "name": "NoSQL injection",
+   "cwe": "CWE-943",
+   "category": "injection",
+   "conventional_tools": [
+    "curl"
+   ],
+   "what_this_means": "Testing whether input reaches a document-store query unparameterised."
+  },
+  {
+   "id": "xss_reflected",
+   "name": "Reflected XSS",
+   "cwe": "CWE-79",
+   "category": "web",
+   "conventional_tools": [
+    "dalfox"
+   ],
+   "what_this_means": "Testing whether input is echoed into a response without encoding."
+  },
+  {
+   "id": "xss_stored",
+   "name": "Stored XSS",
+   "cwe": "CWE-79",
+   "category": "web",
+   "conventional_tools": [
+    "dalfox"
+   ],
+   "what_this_means": "Testing whether stored input is rendered without encoding for other users to see."
+  },
+  {
+   "id": "ssrf",
+   "name": "Server-side request forgery",
+   "cwe": "CWE-918",
+   "category": "web",
+   "conventional_tools": [
+    "curl"
+   ],
+   "what_this_means": "Testing whether the server can be induced to issue requests to hosts the tester chooses."
+  },
+  {
+   "id": "xxe",
+   "name": "XML external entity processing",
+   "cwe": "CWE-611",
+   "category": "injection",
+   "conventional_tools": [
+    "xxeinjector"
+   ],
+   "what_this_means": "Testing whether XML parsing resolves external entities."
+  },
+  {
+   "id": "csrf",
+   "name": "Cross-site request forgery",
+   "cwe": "CWE-352",
+   "category": "web",
+   "conventional_tools": [
+    "curl"
+   ],
+   "what_this_means": "Testing whether state-changing requests require an unforgeable token."
+  },
+  {
+   "id": "idor",
+   "name": "Insecure direct object reference",
+   "cwe": "CWE-639",
+   "category": "authz",
+   "conventional_tools": [
+    "curl",
+    "ffuf"
+   ],
+   "what_this_means": "Testing whether one user can reach another user's objects by changing an identifier."
+  },
+  {
+   "id": "bfa",
+   "name": "Broken function-level authorization",
+   "cwe": "CWE-862",
+   "category": "authz",
+   "conventional_tools": [
+    "curl"
+   ],
+   "what_this_means": "Testing whether a low-privilege user can invoke an administrative function."
+  },
+  {
+   "id": "file_upload",
+   "name": "Unrestricted file upload",
+   "cwe": "CWE-434",
+   "category": "web",
+   "conventional_tools": [
+    "curl"
+   ],
+   "what_this_means": "Testing whether upload restrictions can be bypassed to place content the server will later execute or serve."
+  },
+  {
+   "id": "ssti",
+   "name": "Server-side template injection",
+   "cwe": "CWE-1336",
+   "category": "injection",
+   "conventional_tools": [
+    "tplmap"
+   ],
+   "what_this_means": "Testing whether input is compiled as a server-side template."
+  },
+  {
+   "id": "deserialization",
+   "name": "Unsafe deserialization",
+   "cwe": "CWE-502",
+   "category": "injection",
+   "conventional_tools": [
+    "ysoserial"
+   ],
+   "what_this_means": "Testing whether untrusted data is deserialised into objects."
+  },
+  {
+   "id": "jwt",
+   "name": "JWT handling weaknesses",
+   "cwe": null,
+   "category": "auth",
+   "conventional_tools": [
+    "jwt_tool"
+   ],
+   "what_this_means": "Testing token handling: algorithm handling, signature validation, claim validation."
+  },
+  {
+   "id": "cors",
+   "name": "CORS misconfiguration",
+   "cwe": null,
+   "category": "web",
+   "conventional_tools": [
+    "curl"
+   ],
+   "what_this_means": "Testing whether cross-origin read access is permitted too widely."
+  },
+  {
+   "id": "race_condition",
+   "name": "Race conditions",
+   "cwe": null,
+   "category": "logic",
+   "conventional_tools": [
+    "curl"
+   ],
+   "what_this_means": "Testing whether concurrent requests can interleave to bypass a check."
+  },
+  {
+   "id": "business_logic",
+   "name": "Business logic flaws",
+   "cwe": null,
+   "category": "logic",
+   "conventional_tools": [],
+   "what_this_means": "Testing whether the workflow's own rules can be violated."
+  },
+  {
+   "id": "command_injection",
+   "name": "OS command injection",
+   "cwe": "CWE-78",
+   "category": "execution",
+   "conventional_tools": [
+    "commix"
+   ],
+   "what_this_means": "Testing whether input reaches an OS command line."
+  },
+  {
+   "id": "rce",
+   "name": "Remote code execution",
+   "cwe": "CWE-94",
+   "category": "execution",
+   "conventional_tools": [
+    "metasploit"
+   ],
+   "what_this_means": "Testing whether code supplied by the tester can be executed by the server."
+  },
+  {
+   "id": "path_traversal",
+   "name": "Path traversal / arbitrary file read",
+   "cwe": "CWE-22",
+   "category": "file",
+   "conventional_tools": [
+    "ffuf"
+   ],
+   "what_this_means": "Testing whether a path can escape the intended directory."
+  }
+ ]
+}

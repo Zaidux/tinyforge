@@ -238,6 +238,29 @@ concurrency or state, which a spec does not state.
 That is the next concrete gap, and it is now *specific* rather than
 speculative — which is what wider coverage was supposed to buy.
 
+**Resolved.** A numeric quantity on a stateful operation is the strongest
+concurrency signal a specification gives: an order line carrying `quantity`
+with a stated minimum is a balance/check-then-act surface whether or not
+anything names concurrency — which a spec never does. `race_condition` now
+fires on `js-b2b`.
+
+A second correction fell out of the same work. `csrf` was firing on
+`js-b2b` via the `has_object_ids` proxy, but the spec declares **header-borne**
+bearer auth, which is not ambient — so classic CSRF does not apply and CORS
+is the relevant concern. Declared transport now overrides the proxy:
+
+```
+header-borne auth  ->  csrf suppressed, cors stands
+cookie-borne auth  ->  csrf applies
+transport unknown  ->  fall back to the state-changing proxy
+```
+
+That is the spec overriding a heuristic, which is the correct direction:
+authoritative evidence beats inference.
+
+Re-checked against the original three targets and their 69 judgements —
+no regression (precision 1.000, over-flag 0.000, recall 0.767 / 0.727).
+
 ### What has not changed
 
 The three original targets and their 69 judgements are untouched, and the

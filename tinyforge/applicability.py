@@ -243,17 +243,35 @@ def _predicate_registry() -> dict[str, Callable[[Mapping[str, object]], bool]]:
         "has_deserialization": lambda f: _has_any(f, "has_deserialization"),
         "uses_jwt": lambda f: _has_any(f, "uses_jwt"),
         "has_cors": lambda f: _has_any(f, "has_cors"),
-        "has_state_transitions": lambda f: _has_any(f, "has_state_transitions"),
+        # Quantitative fields imply state even without the word
+        # "transition" appearing anywhere.
+        "has_state_transitions": lambda f: _has_any(f, "has_state_transitions")
+        or _has_any(f, "has_quantitative_state"),
         "has_commerce": lambda f: _has_any(f, "has_commerce"),
         "has_shell_output": lambda f: _has_any(f, "has_shell_output"),
         "has_code_execution_path": lambda f: _has_any(f, "has_code_execution_path"),
         "has_file_access": lambda f: _has_any(f, "has_file_access"),
         "has_cookie_auth": lambda f: _has_any(f, "has_cookie_auth"),
+        # An API that accepts numeric quantities is exercising state, even
+        # when nothing names concurrency.
+        "has_quantitative_state": lambda f: _has_any(f, "has_quantitative_state"),
         "has_header_auth": lambda f: _has_any(f, "has_header_auth"),
         # Corrected predicates (APPLICABILITY.md items 1-3).
-        "has_state_changing_endpoint": lambda f: _has_any(
-            f, "has_state_changing_endpoint"
-        ) or _has_any(f, "has_object_ids") or _has_any(f, "has_login"),
+        # CSRF needs an *ambient* credential — one the browser attaches
+    # automatically. A bearer token in an Authorization header is not
+    # ambient, so classic CSRF does not apply and CORS is the concern.
+    # When the transport is explicitly declared header-borne, the proxy
+    # must not override that: a spec that says so is better evidence than
+    # "this endpoint changes state".
+    "has_state_changing_endpoint": lambda f: (
+        False
+        if (f.get("has_header_auth") and not f.get("has_cookie_auth"))
+        else (
+            _has_any(f, "has_state_changing_endpoint")
+            or _has_any(f, "has_object_ids")
+            or _has_any(f, "has_login")
+        )
+    ),
         # Any HTTP surface is browser-reachable, so a CORS header check is
         # warranted wherever a network surface exists. Requiring evidence of
         # a browser client (item 1's first attempt) still missed upload

@@ -108,3 +108,44 @@ class TestTargetBuild:
             observations_from_openapi(DOC), target_id="t", module="b2b"
         )
         json.dumps(t.as_dict())
+
+
+class TestSpecEvidenceOverridesProxy:
+    """A specification that declares auth transport is better evidence than a
+    proxy. Getting this wrong manufactures both a false positive and a false
+    negative at once."""
+
+    def _profile(self, **facts):
+        from tinyforge.applicability import TargetProfile, applicable
+
+        return applicable(TargetProfile("t", facts=facts))
+
+    def test_header_auth_suppresses_csrf(self):
+        # A bearer token in a header is not ambient, so classic CSRF does not
+        # apply even on a state-changing endpoint.
+        assert "csrf" not in self._profile(
+            has_object_ids=True, has_header_auth=True, has_login=False
+        )
+
+    def test_cookie_auth_keeps_csrf(self):
+        assert "csrf" in self._profile(
+            has_object_ids=True, has_cookie_auth=True
+        )
+
+    def test_unknown_transport_keeps_csrf(self):
+        # No transport observed: fall back to the state-changing proxy.
+        assert "csrf" in self._profile(has_object_ids=True)
+
+    def test_quantity_implies_state_transition(self):
+        from tinyforge.targets import Observation, infer_facts
+
+        f, _ = infer_facts([Observation("source", "parameter quantity minimum 1")])
+        assert f["has_state_transitions"] is True
+
+    def test_numeric_order_line_sets_race_condition(self):
+        from tinyforge.applicability import TargetProfile, applicable
+
+        techs = applicable(TargetProfile("b2b", facts={
+            "has_quantitative_state": True, "has_network_surface": True,
+        }))
+        assert "race_condition" in techs

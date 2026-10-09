@@ -142,6 +142,18 @@ FACT_SIGNALS: dict[str, tuple[tuple[str, str], ...]] = {
     ),
     "has_state_transitions": (
         (r"\b(state|transition|workflow|status)\b", "state transition concept"),
+        # A numeric quantity on a stateful operation is the strongest
+        # concurrency signal an API spec gives. An order line carrying
+        # `quantity` with a stated minimum is a balance/check-then-act
+        # surface whether or not anything names concurrency explicitly -
+        # which a specification never does.
+        (r"\b(quantity|quantities|amount|total|count|balance|credits?|"
+         r"stock|inventory|points?|units?)\b",
+         "quantitative state field on a request"),
+        # A response that returns a derived value implies the server
+        # computed it from state.
+        (r"\b(paymentdue|orderno|invoice|balance|total|price)\b",
+         "state-derived response field"),
     ),
     "has_reflected_input": (
         (r"\b(search|query|q=|reflect)\b", "reflected parameter"),

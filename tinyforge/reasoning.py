@@ -93,6 +93,10 @@ ATTACK_INDICATORS: dict[str, tuple[str, ...]] = {
         "another user's record", "changed the identifier to access",
         "incremented the id to read", "other account's data",
         "horizontal access", "swapped the object id",
+        # Analysts describe the navigation rather than the access pattern,
+        # which is how they actually write about it.
+        "numeric path segment", "path segment", "another accoun",
+        "every other account",
     ),
     "bfa": (
         "administrative function", "admin endpoint as a normal user",

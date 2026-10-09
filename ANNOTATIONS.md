@@ -102,3 +102,56 @@ correctness, for the same reason the first scorer evaluation was worthless.
 **Real progress requires targets we did not design** — a lab, a CTF, an
 open-source deliberately vulnerable application — where an expert applies
 our predicates without having seen them written.
+---
+
+## The form
+
+`annotations/FORM.md` — generated, ready to fill. Three Juice Shop targets,
+**69 judgements per annotator** (3 targets × 23 techniques).
+
+Also: `annotations/targets.json` (inferred facts with provenance),
+`annotations/form.csv` for spreadsheet use.
+
+Three targets from one application, deliberately:
+
+| Target | Surface | Distinct because |
+|---|---|---|
+| `js-full` | whole app | everything reachable |
+| `js-api` | REST API only | no upload, no XML, no templating |
+| `js-upload` | file/XML/deserialisation surface | no login, no object IDs |
+
+Distinct surfaces are the point. A single whole-app target would give one
+applicability judgement per technique and tell us nothing about whether the
+function discriminates.
+
+### Why 23 rows per target, not just the applicable ones
+
+Pre-filtering to what we predict would apply would leak our answer into the
+question — the same circularity that made the first scorer evaluation
+worthless. The reviewer sees every technique and decides from the facts.
+
+`unsure` is a real answer and should be used. Collapsing it into `no`
+manufactures false applicability labels, which then look like our false
+positives.
+
+### After completion
+
+```python
+from tinyforge.annotation_form import load_judgements
+from tinyforge.labelset import applicability_report
+```
+
+`applicability_report` gives precision, recall, and — most usefully — the
+concrete list of techniques a reviewer says we **miss**. That list is the
+work queue: those are tests our checker would never suggest.
+
+### Realistic expectations
+
+69 judgements per annotator is roughly 20–30 minutes. Two annotators is the
+minimum for agreement to be measurable — one annotator measures agreement
+with *their* judgement, not correctness.
+
+This will not settle the project's headline claim. 3 targets is far below
+the 400 paired tasks `power.py` needs for a +10% effect. It will settle
+whether the **ground truth itself is sound**, which is the thing currently
+unvalidated and the thing that gates everything else.

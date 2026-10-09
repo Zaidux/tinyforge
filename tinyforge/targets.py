@@ -79,12 +79,15 @@ FACT_SIGNALS: dict[str, tuple[tuple[str, str], ...]] = {
          "relational database fingerprint"),
     ),
     "uses_nosql": (
-        (r"\b(mongodb|mongo|couchdb|dynamodb|cassandra)\b",
+        (r"(mongodb|mongo|couchdb|dynamodb|cassandra|mongoose)",
          "document-store fingerprint"),
     ),
     "uses_jwt": (
         (r"\beyJ[A-Za-z0-9_-]{5,}", "JWT in response or cookie"),
-        (r"\b(jwt|bearer)\b", "JWT or bearer token reference"),
+        # "jsonwebtoken" does not contain the substring "jwt", so a bare
+        # jwt pattern misses the dependency that is the most direct
+        # evidence available. "webtoken" is the actual shared fragment.
+        (r"(jwt|bearer|webtoken)", "JWT library or bearer token reference"),
     ),
     "has_session_auth": (
         (r"\b(jsessionid|phpsessid|sid|csrf)\b", "session cookie observed"),
@@ -103,16 +106,24 @@ FACT_SIGNALS: dict[str, tuple[tuple[str, str], ...]] = {
     "accepts_xml": (
         (r"(content-type:\s*application/xml|text/xml|<!doctype|<!entity)",
          "XML content type or doctype"),
+        # An XML parser in the dependency tree is direct evidence even
+        # without a live response.
+        (r"(xml-resolver|libxml|xmldom|saxparser|xml2js|xml\.etree)",
+         "XML parser in the dependency tree"),
     ),
     "has_deserialization": (
-        (r"\b(serializ|deserializ|pickle|unmarshal|objectinputstream)\b",
+        (r"(serializ|deserializ|pickle|unmarshal|objectinputstream)",
          "serialisation surface"),
+        # Sandbox/VM-based JS deserialisation carries none of the words above.
+        (r"(notevil|node-serialize|vm2|\bjvm\b|unserialize)",
+         "sandbox or VM deserialisation dependency"),
     ),
     "has_templating": (
-        (r"\b(jinja|twig|handlebars|ejs|template|blade)\b", "template engine"),
+        (r"(jinja|twig|handlebars|ejs|template|blade|pug|thymeleaf|freemarker)",
+         "template engine"),
     ),
     "makes_server_requests": (
-        (r"\b(webhook|proxy|fetch|callback|redirect_url|url=)\b",
+        (r"(webhook|proxy|fetch|callback|redirect_url|url=|/whoami|request\.get)",
          "server-side fetch surface"),
     ),
     "has_cors": (
@@ -134,11 +145,11 @@ FACT_SIGNALS: dict[str, tuple[tuple[str, str], ...]] = {
         (r"(/etc/passwd|file=|\.\./|download)", "file access surface"),
     ),
     "has_shell_output": (
-        (r"\b(shell|exec|command|ping|nslookup|cat\s|system\()\b",
+        (r"(shell|exec|command|ping|nslookup|system\(|child_process|backticks)",
          "command surface"),
     ),
     "has_code_execution_path": (
-        (r"\b(eval|exec|deserializ|template injection|rce|pickle)\b",
+        (r"(eval|exec|deserializ|template injection|rce|pickle|notevil)",
          "code execution path"),
     ),
 }
@@ -204,11 +215,12 @@ def infer_facts(observations: Sequence[Observation]) -> tuple[dict[str, bool], d
     leaves the fact unset, which is what keeps a sparse target from being
     treated as if we knew it was clean.
     """
-    blob_parts: list[str] = []
-    for obs in observations:
-        blob_parts.append(obs.value)
-        blob_parts.append(obs.kind)
-    blob = "\n".join(blob_parts).lower()
+    # Only the observation *values* form the blob. Including `kind` would
+    # let the literal "source" satisfy the bare `rce` pattern (sou-rce),
+    # manufacturing a phantom code-execution test on every observation.
+    # Signal patterns are matched against evidence, never against our own
+    # vocabulary for describing it.
+    blob = "\n".join(obs.value for obs in observations).lower()
 
     facts: dict[str, bool] = {}
     provenance: dict[str, list[str]] = {}

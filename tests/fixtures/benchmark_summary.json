@@ -1,0 +1,32 @@
+{
+ "source": "OWASP BenchmarkJava expectedresults-1.2.csv",
+ "url": "https://raw.githubusercontent.com/OWASP-Benchmark/BenchmarkJava/master/expectedresults-1.2.csv",
+ "total": 2740,
+ "vulnerable": 1415,
+ "negative": 1325,
+ "techniques": [
+  "bfa",
+  "command_injection",
+  "config_review",
+  "path_traversal",
+  "sql_injection",
+  "xss_reflected"
+ ],
+ "negative_per_technique": {
+  "bfa": 43,
+  "command_injection": 125,
+  "config_review": 529,
+  "path_traversal": 135,
+  "sql_injection": 284,
+  "xss_reflected": 209
+ },
+ "positive_per_technique": {
+  "bfa": 83,
+  "command_injection": 126,
+  "config_review": 513,
+  "path_traversal": 133,
+  "sql_injection": 314,
+  "xss_reflected": 246
+ },
+ "caveat": "labels are the benchmark authors' claim; the application was not executed here, so negatives are unverified"
+}

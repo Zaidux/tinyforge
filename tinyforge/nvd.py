@@ -123,6 +123,17 @@ CWE_TECHNIQUE: dict[str, str] = {
     "CWE-799": "business_logic",
     "CWE-840": "business_logic",
     "CWE-472": "auth_session",
+    # Added after the BenchmarkJava gate: 1,262 of 2,740 cases carry one of
+    # these CWEs, and without them the only source of negative ground truth
+    # would be unusable for half its population.
+    "CWE-328": "config_review",    # weak hash
+    "CWE-327": "config_review",    # broken/weak crypto
+    "CWE-330": "config_review",    # insufficient randomness
+    "CWE-331": "config_review",    # insufficient entropy
+    "CWE-501": "bfa",              # trust boundary violation
+    "CWE-614": "config_review",    # sensitive cookie without Secure flag
+    "CWE-90": "sql_injection",     # LDAP injection (injection to query)
+    "CWE-643": "sql_injection",    # XPath injection
 }
 
 #: Reverse index: which CWEs should we query to test a technique?

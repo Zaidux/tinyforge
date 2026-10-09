@@ -1,0 +1,15 @@
+{
+ "tasks": 33,
+ "total_stages": 160,
+ "unmapped_stages": 0,
+ "stage_coverage": 1.0,
+ "tasks_with_techniques": 32,
+ "technique_coverage": 0.9697,
+ "distinct_techniques": [
+  "auth_session",
+  "config_review",
+  "file_upload",
+  "port_scan",
+  "recon"
+ ]
+}

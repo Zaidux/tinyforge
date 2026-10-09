@@ -144,3 +144,8 @@ pip install -e ".[lora]"    # Student A only, adds ~2 GiB torch
 ## License
 
 MIT
+
+> **CI status:** the workflow in `.github/workflows/ci.yml` is currently
+> blocked by an account-level GitHub Actions lock ("billing issue"), so no
+> runners start. This is not a code failure — the workflow has not executed.
+> All 50 tests pass locally via `PYTHONPATH=. python3 -m pytest tests/ -q`.

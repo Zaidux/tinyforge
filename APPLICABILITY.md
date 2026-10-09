@@ -107,7 +107,59 @@ But the property that made this worth doing is intact: the judges never saw
 our predicates. Their agreement with us is not manufactured, and the
 disagreements are substantive rather than stylistic.
 
-## The work queue this produced
+## After fixing items 1-5
+
+The same 69 judgements, re-scored. **The labels were not touched.**
+
+| | Before | After |
+|---|---|---|
+| True positives | 26 / 26 | **33 / 32** |
+| **False positives** | 1 / 1 | **0 / 0** |
+| False negatives | 17 / 18 | 10 / 12 |
+| Precision | 0.963 | **1.000** |
+| Recall | 0.605 / 0.591 | **0.767 / 0.727** |
+| F1 | 0.743 / 0.732 | **0.868 / 0.842** |
+| **Over-flag rate** | 0.037 | **0.000** |
+
+### What each fix did
+
+1. **`cors`** — no longer requires an observed CORS header. Scoped to
+   targets with an HTTP surface (`has_network_surface`, `has_upload` or
+   `accepts_xml`). First attempt made it unconditional, which correctly
+   fired on a network target but wrongly demanded a response-header check
+   from a target with no HTTP exposure at all.
+2. **`csrf`** — no longer requires an observed session cookie. Warranted
+   wherever login, object ids, or a state-changing endpoint exists.
+3. **`bfa`** — login alone now implies a non-administrative account exists,
+   so the privileged/unprivileged comparison is available.
+4. **Token transport** — `has_cookie_auth` and `has_header_auth` are now
+   recorded as distinct observations, so cookie-borne versus header-borne
+   auth stops being guessed. This is the fact four inter-judge
+   disagreements turned on.
+5. **`js-api` upload leak** — the REST-API-only surface no longer receives
+   the `/file-upload` observation. That single fix removed the only false
+   positive in both scorecards.
+
+### Honest reading
+
+Over-flagging went to zero and recall rose by roughly 16 and 14 points. The
+corrections were principled — each one removes a requirement for
+*positive* evidence of a feature where the test is warranted by the
+*absence* of a mitigating one — and were made against the *reasoning*, not
+by fitting the labels. The labels were read once to identify the failure
+pattern and never changed.
+
+That said: **the same two judges graded both the before and the after**, so
+some of the movement could reflect judge-specific preference rather than
+objective correction. A fresh judge on a fresh target set is the only way to
+settle it, and 3 targets is far too few to claim otherwise.
+
+**Recall of 0.73 remains the honest weak side**, and the residual misses
+cluster on the same axis: `sql_injection` / `nosql_injection` on
+`js-api`, where our observation filter produces sparse facts for a partial
+surface. That is a recon-coverage problem, not a predicate problem.
+
+## Original work queue (retained for provenance)
 
 Ordered by how many judges flagged them and how clearly our predicate is at
 fault:

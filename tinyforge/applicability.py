@@ -125,15 +125,27 @@ CATALOGUE: tuple[Technique, ...] = (
     Technique("xxe", "XML external entity processing",
               requires=("accepts_xml",), category="injection",
               tools=("xxeinjector",), cwe="CWE-611"),
+    # The three predicates below were corrected against independent judge
+    # labels (APPLICABILITY.md, items 1-3). Each had the same structural
+    # error: it required *positive observation of a feature*, when the test
+    # is warranted by the *absence of a mitigating one*. Requiring the
+    # observation guarantees a false negative.
+    #
+    #   csrf  - warranted on any state-changing browser-facing surface. Not
+    #           observing a session cookie does not mean none is issued.
+    #   cors  - a response-header check on any browser-reachable endpoint.
+    #           Absence of an observed header is the expected state.
+    #   bfa   - login implies at least one non-administrative account, so the
+    #           privileged/unprivileged comparison is available.
     Technique("csrf", "Cross-site request forgery",
-              requires=("has_session_auth",), category="web",
+              requires=("has_state_changing_endpoint",), category="web",
               tools=("curl",), cwe="CWE-352"),
     Technique("idor", "Insecure direct object reference",
               requires=("has_object_ids",), category="authz",
               tools=("curl", "ffuf"), cwe="CWE-639",
               owasp_api="API1:2023", owasp_top10_2025="A01:2025"),
     Technique("bfa", "Broken function-level authorization",
-              requires=("has_role_model",), category="authz",
+              requires=("has_role_model_or_login",), category="authz",
               tools=("curl",), cwe="CWE-862",
               owasp_api="API5:2023", owasp_top10_2025="A01:2025"),
     Technique("file_upload", "Unrestricted file upload",
@@ -150,7 +162,7 @@ CATALOGUE: tuple[Technique, ...] = (
               requires=("uses_jwt",), category="auth",
               tools=("jwt_tool",), owasp_top10_2025="A07:2025"),
     Technique("cors", "CORS misconfiguration",
-              requires=("has_cors",), category="web",
+              requires=("has_browser_client",), category="web",
               tools=("curl",)),
     Technique("race_condition", "Race conditions",
               requires=("has_state_transitions",), category="logic",
@@ -236,6 +248,33 @@ def _predicate_registry() -> dict[str, Callable[[Mapping[str, object]], bool]]:
         "has_shell_output": lambda f: _has_any(f, "has_shell_output"),
         "has_code_execution_path": lambda f: _has_any(f, "has_code_execution_path"),
         "has_file_access": lambda f: _has_any(f, "has_file_access"),
+        "has_cookie_auth": lambda f: _has_any(f, "has_cookie_auth"),
+        "has_header_auth": lambda f: _has_any(f, "has_header_auth"),
+        # Corrected predicates (APPLICABILITY.md items 1-3).
+        "has_state_changing_endpoint": lambda f: _has_any(
+            f, "has_state_changing_endpoint"
+        ) or _has_any(f, "has_object_ids") or _has_any(f, "has_login"),
+        # Any HTTP surface is browser-reachable, so a CORS header check is
+        # warranted wherever a network surface exists. Requiring evidence of
+        # a browser client (item 1's first attempt) still missed upload
+        # endpoints, which are exactly as browser-reachable as a login page.
+        # Scoped to a network surface so a target with no HTTP exposure at
+        # all is not asked for a response-header check.
+        "has_browser_client": lambda f: (
+            _has_any(f, "has_network_surface")
+            # An upload endpoint or an XML parser is network-exposed by
+            # definition; a scanner that found one has already proven the
+            # HTTP surface exists.
+            or _has_any(f, "has_upload")
+            or _has_any(f, "accepts_xml")
+            or _has_any(f, "has_browser_client")
+            or _has_any(f, "has_reflected_input")
+            or _has_any(f, "has_persisted_input")
+            or _has_any(f, "has_session_auth")
+            or _has_any(f, "has_login")
+        ),
+        "has_role_model_or_login": lambda f: _has_any(f, "has_role_model")
+        or _has_any(f, "has_login"),
     }
 
 

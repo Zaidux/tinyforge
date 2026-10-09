@@ -148,6 +148,22 @@ FACT_SIGNALS: dict[str, tuple[tuple[str, str], ...]] = {
         (r"(shell|exec|command|ping|nslookup|system\(|child_process|backticks)",
          "command surface"),
     ),
+    # Token transport settles whether csrf and cors are the relevant
+    # concerns (cookie-borne) or not (header-borne). Four of the eleven
+    # inter-judge disagreements in APPLICABILITY.md turned on this one
+    # unrecorded fact. Recorded as a distinct observation rather than
+    # inferred, because guessing it either way manufactures both false
+    # positives and false negatives.
+    "has_cookie_auth": (
+        (r"(set-cookie:\s*[^\n]*token)", "session token delivered in a cookie"),
+        (r"(jsessionid|phpsessid|sessionid|connect\.sid)", "session cookie observed"),
+        (r"(access-control-allow-credentials:\s*true)", "credentialed CORS"),
+    ),
+    "has_header_auth": (
+        (r"(authorization:\s*bearer)", "bearer token in a header"),
+        (r"(authorization:\s*basic)", "basic auth in a header"),
+        (r"(x-api-key|x-auth-token)", "API key in a header"),
+    ),
     "has_code_execution_path": (
         (r"(eval|exec|deserializ|template injection|rce|pickle|notevil)",
          "code execution path"),

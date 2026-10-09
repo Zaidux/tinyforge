@@ -103,9 +103,14 @@ class TestApplicabilityReport:
         # Our unconditional core (recon, config_review) always applies, so
         # an expert who agrees on those alone gives precision 1.0 while
         # recall reflects only the conditional techniques.
+        # has_login now implies cors/csrf/bfa (corrected predicates), so
+        # the expert label must include them for perfect agreement.
         spec = TargetSpec("t1", "d", observed_facts={"has_login": True})
-        labels = [LabelSet("t1", "alice",
-                           applicable=("recon", "config_review", "auth_session"))]
+        labels = [LabelSet(
+            "t1", "alice",
+            applicable=("recon", "config_review", "auth_session",
+                        "csrf", "cors", "bfa"),
+        )]
         rep = applicability_report([spec], labels)
         assert rep["false_negative"] == 0
         assert rep["false_positive"] == 0

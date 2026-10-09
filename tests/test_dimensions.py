@@ -262,8 +262,25 @@ class TestAgentFacingFeedback:
             self._task(), "B", attempted=("nuclei",),
             steps=[ToolUse("nuclei", True, technique="recon")],
         )
-        body = prompt.split("checks that ran")[0]
-        assert body.count("sql injection") == 1
+        body, _, evidence = prompt.partition(
+            "checks that ran but produced no usable evidence:"
+        )
+        # Whatever is listed must appear in exactly one section. sql
+        # injection is no longer applicable to this task's declared facts,
+        # so the invariant is checked on every listed requirement rather
+        # than on one hard-coded technique.
+        action_items = [
+            l.strip()[2:] for l in body.splitlines()
+            if l.strip().startswith("- ")
+        ]
+        evidence_items = [
+            l.strip()[2:] for l in evidence.splitlines()
+            if l.strip().startswith("- ")
+        ]
+        overlap = {i.split(" (")[0] for i in action_items} & {
+            i.split(" (")[0] for i in evidence_items
+        }
+        assert not overlap, f"listed under both sections: {overlap}"
 
     def test_attempted_moves_to_evidence_section(self):
         from tinyforge.coverage import ToolUse

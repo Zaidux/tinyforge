@@ -89,27 +89,40 @@ class TestMeasuredResult:
         for card in self._cards(judges, targets):
             assert card.over_flag_rate <= 0.10
 
-    def test_under_flagging_dominates(self, judges, targets):
-        # The asymmetry the design bets on.
-        for card in self._cards(judges, targets):
-            assert card.fn > card.fp * 5
-
-    def test_both_judges_agree_on_the_single_false_positive(self, judges, targets):
+    def test_under_flagging_still_dominates(self, judges, targets):
+        # The asymmetry the design bets on. Even with zero false positives
+        # the error is now entirely under-flagging, which is the safe
+        # direction: a missed test costs coverage, a spurious one steers
+        # selection toward a wrong answer.
         cards = self._cards(judges, targets)
         for card in cards:
-            spurious = {t for _, t in card.spurious}
-            # Both judges independently caught the js-api has_upload
-            # contradiction that our own pipeline created.
-            assert spurious == {"file_upload"}
+            assert card.fp == 0
+            assert card.fn > 0
 
-    def test_recall_is_the_known_weakness(self, judges, targets):
-        # Documented in APPLICABILITY.md as items 1-3 of the work queue.
+    def test_false_positive_is_gone(self, judges, targets):
+        """Work-queue item 5: both judges caught a js-api has_upload
+        contradiction our own pipeline created. Fixed, so the spurious set
+        must now be empty. Previously this asserted the bug was present."""
         for card in self._cards(judges, targets):
-            assert card.recall < 0.75
+            assert not card.spurious
 
-    def test_missed_set_is_stable_across_judges(self, judges, targets):
+    def test_recall_is_the_remaining_weakness(self, judges, targets):
+        """Recall was 0.605 / 0.591 before the corrections and is now
+        0.767 / 0.727. Still the weak side, and the honest ceiling to
+        report until more targets are labelled."""
+        for card in self._cards(judges, targets):
+            assert 0.65 < card.recall < 0.85, (
+                f"recall {card.recall:.3f} outside the post-fix band"
+            )
+
+    def test_corrected_predicates_are_no_longer_missed(self, judges, targets):
+        """Work-queue items 1-3: cors, csrf and bfa were required to miss on
+        the old predicates. Both judges flagged them; both are now caught."""
         cards = self._cards(judges, targets)
-        both_missed = (
-            {t for _, t in cards[0].missed} & {t for _, t in cards[1].missed}
-        )
-        assert {"cors", "bfa"} <= both_missed
+        still_missed = {t for _, t in cards[0].missed} | {t for _, t in cards[1].missed}
+        assert not ({"cors", "csrf", "bfa"} & still_missed)
+
+    def test_recall_improved_past_the_old_ceiling(self, judges, targets):
+        # Recall was 0.605 / 0.591 before the corrections.
+        for card in self._cards(judges, targets):
+            assert card.recall > 0.65

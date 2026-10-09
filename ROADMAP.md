@@ -62,6 +62,10 @@ Alternative worth benchmarking: `google/gemma-3-270m-it`, IFEval 51.2 but
 **gated** (accept Gemma terms), and its 256k vocab consumes 170M of its 270M
 params — leaving only 100M in transformer blocks.
 
+> **Superseded in part.** `DESIGN.md` revises stages 3-4: the model becomes
+> a **scorer** beneath a large model rather than a standalone assistant, with
+> **termination/loop detection** as the first target. Stages 0-2 stand.
+
 ## Stage 3 — Student B (trainable on this box)
 
 ~20M params from scratch, pure numpy, ~305 MiB optimiser state.

@@ -113,3 +113,30 @@ class TestLive:
         assert resp.ok, resp.error
         assert "OK" in resp.text.upper()
         assert resp.completion_tokens > 0
+
+class TestReasoningTruncation:
+    """A response can consume the entire budget on reasoning and emit
+    nothing. Recorded naively, that is indistinguishable from 'the model
+    answered badly' — or worse, from 'the scorer arm performed worse',
+    because the judge sees an empty string."""
+
+    def test_detects_all_reasoning_no_content(self):
+        from tinyforge.oracle import _is_reasoning_truncated
+
+        assert _is_reasoning_truncated("", 350, 349, 350) is True
+
+    def test_ignores_responses_with_content(self):
+        from tinyforge.oracle import _is_reasoning_truncated
+
+        assert _is_reasoning_truncated("answer", 350, 349, 350) is False
+
+    def test_ignores_under_budget(self):
+        from tinyforge.oracle import _is_reasoning_truncated
+
+        assert _is_reasoning_truncated("", 100, 99, 350) is False
+
+    def test_ignores_when_reasoning_is_minority(self):
+        from tinyforge.oracle import _is_reasoning_truncated
+
+        # mostly content tokens, but empty output -> not a reasoning stall
+        assert _is_reasoning_truncated("", 350, 20, 350) is False

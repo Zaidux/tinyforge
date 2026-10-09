@@ -83,6 +83,9 @@ class LLMResponse:
     reasoning_tokens: int = 0
     latency_s: float = 0.0
     error: str = ""
+    #: True when the token budget was consumed by reasoning and no visible
+    #: content was produced. See :func:`_is_reasoning_truncated`.
+    reasoning_truncated: bool = False
 
     @property
     def ok(self) -> bool:
@@ -96,7 +99,28 @@ class LLMResponse:
             "reasoning_tokens": self.reasoning_tokens,
             "latency_s": round(self.latency_s, 3),
             "error": self.error,
+            "reasoning_truncated": self.reasoning_truncated,
         }
+
+
+def _is_reasoning_truncated(text: str, completion: int, reasoning: int,
+                            budget: int) -> bool:
+    """Detect a response consumed entirely by reasoning, with no content.
+
+    Observed in practice: ``space-bunny-free`` at ``max_tokens=350`` on an
+    open-ended task returned ``reasoning_tokens=349`` and an empty
+    ``content``. Recorded naively that is indistinguishable from "the model
+    answered badly" — or, worse, from "the scorer arm performed worse",
+    because the judge sees an empty string.
+
+    Two conditions must hold: the budget was actually exhausted, and
+    essentially all of it went to reasoning.
+    """
+    if text.strip():
+        return False
+    if completion < budget:
+        return False
+    return reasoning >= completion * 0.9
 
 
 @dataclass
@@ -106,7 +130,7 @@ class OracleConfig:
     provider: str = "zen"
     model: str = ""
     temperature: float = 0.0
-    max_tokens: int = 512
+    max_tokens: int = 1024
     timeout_s: float = 90.0
     system_prompt: str = ""
 
@@ -207,13 +231,24 @@ class Oracle:
                 body = json.loads(raw.read())
             usage = body.get("usage") or {}
             details = usage.get("completion_tokens_details") or {}
+            text_out = body["choices"][0]["message"].get("content") or ""
+            completion = int(usage.get("completion_tokens") or 0)
+            reasoning = int(details.get("reasoning_tokens") or 0)
+            truncated = _is_reasoning_truncated(
+                text_out, completion, reasoning, cap
+            )
             resp = LLMResponse(
-                text=(body["choices"][0]["message"].get("content") or ""),
+                text=text_out,
                 model=body.get("model", model),
                 prompt_tokens=int(usage.get("prompt_tokens") or 0),
-                completion_tokens=int(usage.get("completion_tokens") or 0),
-                reasoning_tokens=int(details.get("reasoning_tokens") or 0),
+                completion_tokens=completion,
+                reasoning_tokens=reasoning,
                 latency_s=time.perf_counter() - started,
+                reasoning_truncated=truncated,
+                error=(
+                    f"reasoning consumed the entire {cap}-token budget and "
+                    "produced no content; raise max_tokens"
+                ) if truncated else "",
             )
         except urllib.error.HTTPError as exc:
             detail = exc.read()[:200].decode("utf-8", "replace")

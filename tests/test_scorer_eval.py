@@ -123,3 +123,68 @@ class TestEvaluation:
             return n
 
         assert total_gaps(sparse) > total_gaps(dense)
+
+class TestToolNameLimitation:
+    """The defect review 1 identified, and its mitigation.
+
+    An agent can genuinely test a technique using an unconventional tool.
+    Tool-name-only inference then reports it as never tested. This is not a
+    caveat — it is the specification for what a learned scorer is for.
+    """
+
+    def _profile(self):
+        from tinyforge.applicability import TargetProfile
+
+        return TargetProfile(
+            "api",
+            facts={"has_login": True, "has_relational_db": True,
+                   "has_object_ids": True},
+        )
+
+    def test_tool_only_misses_reasoned_coverage(self):
+        # Reproduces the failure mode exactly: auth tested with curl.
+        s = ApplicabilityScorer()
+        v = s.score("c", self._profile(), attempted=["curl"],
+                    trajectory_text="I probed for SQL injection manually.",
+                    use_reasoning=False)
+        assert "sql_injection" in v.technique_gaps
+
+    def test_reasoning_path_recovers_it(self):
+        s = ApplicabilityScorer()
+        v = s.score("c", self._profile(), attempted=["curl"],
+                    trajectory_text="I probed for SQL injection manually.")
+        assert "sql_injection" not in v.technique_gaps
+
+    def test_reasoning_only_is_reported(self):
+        s = ApplicabilityScorer()
+        v = s.score("c", self._profile(), attempted=["curl"],
+                    trajectory_text="I probed for SQL injection manually.")
+        assert "sql_injection" in v.evidence.reasoning_only
+
+    def test_silence_still_flags(self):
+        # The mitigation must not swallow genuine gaps.
+        s = ApplicabilityScorer()
+        v = s.score("c", self._profile(), attempted=["curl"],
+                    trajectory_text="Ran curl. Nothing further.")
+        assert "sql_injection" in v.technique_gaps
+
+    def test_unrelated_text_does_not_clear(self):
+        s = ApplicabilityScorer()
+        v = s.score("c", self._profile(), attempted=["curl"],
+                    trajectory_text="The authentication header is missing.")
+        assert "sql_injection" in v.technique_gaps
+
+    def test_evidence_serialisable(self):
+        import json
+
+        s = ApplicabilityScorer()
+        v = s.score("c", self._profile(), ["curl"], "tested xss")
+        json.dumps(v.evidence.as_dict())
+
+    def test_every_technique_has_markers_or_none(self):
+        from tinyforge.applicability import CATALOGUE
+        from tinyforge.applicability_scorer import REASONING_MARKERS
+
+        # Markers are optional, but a typo'd key silently disables recovery.
+        for tech in CATALOGUE:
+            assert tech.id in REASONING_MARKERS, tech.id

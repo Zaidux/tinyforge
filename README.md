@@ -68,6 +68,29 @@ evidence marker absent), not a semantic one. That dodges the documented
 failure mode where small verifiers break down on memorization-bound tasks
 ([T1](https://arxiv.org/abs/2504.04718) — distillation does not fix it).
 
+### Known limitation: tool-name-only inference
+
+The current scorer infers coverage from **tool-name intersection**, which is
+a real defect. An agent can genuinely test authentication with `curl` rather
+than a dedicated auth tool, and the scorer will report it was never tested.
+
+A reasoning-text path now mitigates this, and `Evidence.reasoning_only`
+exposes exactly the cases a learned component would need to recover. That
+gap is the clearest specification we have for what a trained model is *for*.
+
+## Prior art
+
+[Microsoft's Universal Verifier](https://www.microsoft.com/en-us/research/articles/the-art-of-building-verifiers-for-computer-use-agents/)
+(April 2026) is the closest neighbour and is worth reading in full. It
+reports false-positive rates for its competitors — **WebVoyager ≥45%,
+WebJudge ≥22%** — against its own 0.01. That is strong validation of the
+*problem*: independent verification of agent work is genuinely unsolved.
+
+Its verifier is ~3,000 lines of code and ~2,000 of prompts, built over 96
+experiments and three weeks on a frontier backbone. **That is the
+differentiation:** not "better verifier", but "verifier that fits in ~1 GiB
+on one core". Full assessment in [`REVIEW.md`](REVIEW.md).
+
 ## Honest targets
 
 Not everything the original brief asked for survives contact with the
